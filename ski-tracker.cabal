@@ -13,4 +13,7 @@ executable ski-tracker
                    time,
                    old-locale
   ghc-options:     -Wall
+  other-modules:   
+                   Track,
+                   TCX
 
