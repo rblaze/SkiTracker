@@ -6,14 +6,26 @@ build-type:     Simple
 executable ski-tracker
   hs-source-dirs:  src
   main-is:         Main.hs
-  build-depends:   
-                   base >= 4,
+  build-depends:   base >= 4,
                    xml,
                    bytestring,
                    time,
                    old-locale
   ghc-options:     -Wall
-  other-modules:   
-                   Track,
-                   TCX
+
+test-suite TestMain
+  type:            exitcode-stdio-1.0
+  x-uses-tf:       true
+  build-depends:   
+                   base >= 4,
+                   HUnit >= 1.2 && < 2,
+                   QuickCheck >= 2.4,
+                   test-framework >= 0.4.1,
+                   test-framework-quickcheck2,
+                   test-framework-hunit
+  hs-source-dirs:  
+                   tests,
+                   src
+  ghc-options:     -Wall -rtsopts
+  main-is:         Main.hs
 
