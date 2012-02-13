@@ -1,7 +1,5 @@
 module MinQueue (MinQueue, empty, MinQueue.minimum, push, pop, peek, MinQueue.null) where
 
-import Control.Monad (liftM2)
-
 data MinStack a = MinStack { values :: [a], minimums :: [a] }
     deriving Show
 
