@@ -16,7 +16,9 @@ main = defaultMain tests
             testCase "FlindersPeak - Buninyong" testVinc1,
             testCase "Moscow - StPetersburg" testVinc2,
             testCase "Moscow - Johannesburg" testVinc3,
-            testCase "StPetersburg - Rio de Janeiro" testVinc4
+            testCase "StPetersburg - Rio de Janeiro" testVinc4,
+            testCase "Zero distance" testVinc5,
+            testCase "Equator" testVinc6
         ]
      ]
 
@@ -46,4 +48,15 @@ testVinc4 = vincentyDistance stpetersburg rio @?= 11312892.565
     where
     stpetersburg = Position (g2r 59.930950) (g2r 30.361865)
     rio = Position (g2r $ -22.904483) (g2r $ -43.209071)
+
+testVinc5 :: Assertion    
+testVinc5 = vincentyDistance rio rio @?= 0
+    where
+    rio = Position (g2r $ -22.904483) (g2r $ -43.209071)
+
+testVinc6 :: Assertion    
+testVinc6 = vincentyDistance p1 p2 @?= 55478.459
+    where
+    p1 = Position 0 (g2r 144.424867)
+    p2 = Position 0 (g2r 143.92649552)
     

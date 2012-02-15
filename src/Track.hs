@@ -1,4 +1,4 @@
-module Track (Position(Position), TrackPoint(TrackPoint), vincentyDistance) where
+module Track (Position(Position), TrackPoint(TrackPoint), vincentyDistance, directDistance) where
 
 import Data.Ratio ((%))
 import Data.Time (UTCTime)
@@ -9,19 +9,27 @@ data Position = Position Double Double  -- Lat Long
 data TrackPoint = TrackPoint UTCTime Position Double -- Altitude
     deriving (Show)
 
-vincentyDistance :: Position -> Position -> Double
-vincentyDistance pos1 pos2 = round2mm (b * al * (fin_sig - dsig))
+p2 :: Int
+p2 = 2
+
+directDistance :: TrackPoint -> TrackPoint -> Double
+directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = sqrt (altdist ^ p2 + landdist ^ p2)
     where
-    p2 = 2 :: Int
+    altdist = alt1 - alt2
+    landdist = vincentyDistance pos1 pos2 
+
+vincentyDistance :: Position -> Position -> Double
+vincentyDistance (Position lat1 long1) (Position lat2 long2) 
+    | lat1 == lat2 && long1 == long2 = 0 
+    | otherwise = round2mm (b * al * (fin_sig - dsig))
+    where
     a = 6378137.0       -- length of major axis of the ellipsoid (radius at equator)
     f = 1/298.257223563 -- flattening of the ellipsoid
-    b = (1 - f) * a      -- length of minor axis of the ellipsoid (radius at the poles)
-    Position lat1 long1 = pos1
-    Position lat2 long2 = pos2
+    b = (1 - f) * a     -- length of minor axis of the ellipsoid (radius at the poles)
     u1 = atan ((1 - f) * tan lat1)
     u2 = atan ((1 - f) * tan lat2)
     ll = long2 - long1
-    la_good = convergeTo 1e-12 0 (iterate stepla ll)
+    la_good = convergeTo 0 1e-12 (iterate stepla ll)
     (fin_cos2al, fin_sinsig, fin_cossig, fin_cossigm2, _, fin_sig) = precalc la_good 
     up2 = fin_cos2al * (a ^ p2 - b ^ p2) / (b ^ p2)
     al = 1 + up2 / 16384 * (4096 + up2 * (-768 + up2 * (320 - 175 * up2)))
@@ -36,14 +44,15 @@ vincentyDistance pos1 pos2 = round2mm (b * al * (fin_sig - dsig))
         sig = atan2 sinsig cossig
         sinal = cos u1 * cos u2 * sin la / sinsig
         cos2al = 1 - (sinal ^ p2)
-        cossigm2 = cossig - 2 * sin u1 * sin u2 / cos2al
+        cossigm2 
+            | cos2al == 0 = 0
+            | otherwise = cossig - 2 * sin u1 * sin u2 / cos2al
 
     stepla :: Double -> Double
-    stepla la = nla
+    stepla la = ll + (1 - cl) * f * sinal * (sig + cl * sinsig * (cossigm2 + cl * cossig * (-1 + 2 * (cossigm2 ^ p2))))
         where
         (cos2al, sinsig, cossig, cossigm2, sinal, sig) = precalc la 
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
-        nla = ll + (1 - cl) * f * sinal * (sig + cl * sinsig * (cossigm2 + cl * cossig * (-1 + 2 * (cossigm2 ^ p2))))
 
     round2mm :: Double -> Double
     round2mm x = fromRational (round (x * 1000) % 1000)    
