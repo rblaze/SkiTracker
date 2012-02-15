@@ -1,8 +1,11 @@
-module Track (Position(Position), TrackPoint(TrackPoint), vincentyDistance, directDistance) where
+module Track (Position(Position), TrackPoint(TrackPoint), vincentyDistance, directDistance,
+        trackLength) where
 
 import Data.Ratio ((%))
 import Data.Time (UTCTime)
 import Math.Sequence.Converge (convergeTo)
+
+import Data.List
 
 data Position = Position Double Double  -- Lat Long
     deriving (Show)
@@ -56,3 +59,8 @@ vincentyDistance (Position lat1 long1) (Position lat2 long2)
         where
         (cos2al, sinsig, cossig, cossigm2, sinal, sig) = precalc la 
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
+        
+trackLength :: [TrackPoint] -> Double
+trackLength track = snd $ foldl step (head track, 0.0) track
+    where
+    step (prev, dist) point = (point, dist + directDistance prev point)

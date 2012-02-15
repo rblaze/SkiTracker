@@ -16,8 +16,11 @@ parseTcxPoint x = liftM3 TrackPoint time pos alt
           pos = join $ liftM parsePosition $ getChild "Position" x  
 
           parsePosition :: Element -> Maybe Position
-          parsePosition el = liftM2 Position (readAttr "LatitudeDegrees" el) (readAttr "LongitudeDegrees" el)
+          parsePosition el = liftM2 Position (liftM g2r $ readAttr "LatitudeDegrees" el) (liftM g2r $ readAttr "LongitudeDegrees" el)
 
+          g2r :: Double -> Double
+          g2r angle = angle * pi / 180
+          
           getChild :: String -> Element -> Maybe Element
           getChild name = findChild (elName x) { qName = name }
 
