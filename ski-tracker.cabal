@@ -6,11 +6,13 @@ build-type:     Simple
 executable ski-tracker
   hs-source-dirs:  src
   main-is:         Main.hs
-  build-depends:   base >= 4,
+  build-depends:   
+                   base >= 4,
                    xml,
                    bytestring,
                    time,
-                   old-locale
+                   old-locale,
+                   converge
   ghc-options:     -Wall
 
 test-suite TestMain
