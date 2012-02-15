@@ -12,8 +12,11 @@ data TrackPoint = TrackPoint UTCTime Position Double -- Altitude
 p2 :: Int
 p2 = 2
 
+round2mm :: Double -> Double
+round2mm x = fromRational (round (x * 1000) % 1000)    
+
 directDistance :: TrackPoint -> TrackPoint -> Double
-directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = sqrt (altdist ^ p2 + landdist ^ p2)
+directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sqrt (altdist ^ p2 + landdist ^ p2)
     where
     altdist = alt1 - alt2
     landdist = vincentyDistance pos1 pos2 
@@ -53,6 +56,3 @@ vincentyDistance (Position lat1 long1) (Position lat2 long2)
         where
         (cos2al, sinsig, cossig, cossigm2, sinal, sig) = precalc la 
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
-
-    round2mm :: Double -> Double
-    round2mm x = fromRational (round (x * 1000) % 1000)    
