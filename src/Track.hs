@@ -1,11 +1,10 @@
 module Track (Position(Position), TrackPoint(TrackPoint), vincentyDistance, directDistance,
-        trackLength) where
-
-import Data.Ratio ((%))
-import Data.Time (UTCTime)
-import Math.Sequence.Converge (convergeTo)
+        trackLength, trackSpeed) where
 
 import Data.List
+import Data.Ratio ((%))
+import Data.Time (UTCTime, diffUTCTime)
+import Math.Sequence.Converge (convergeTo)
 
 data Position = Position Double Double  -- Lat Long
     deriving (Show)
@@ -26,8 +25,8 @@ directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sq
 
 vincentyDistance :: Position -> Position -> Double
 vincentyDistance (Position lat1 long1) (Position lat2 long2) 
-    | lat1 == lat2 && long1 == long2 = 0 
-    | otherwise = round2mm (b * al * (fin_sig - dsig))
+    | lat1 == lat2 && long1 == long2    = 0 
+    | otherwise                         = round2mm (b * al * (fin_sig - dsig))
     where
     a = 6378137.0       -- length of major axis of the ellipsoid (radius at equator)
     f = 1/298.257223563 -- flattening of the ellipsoid
@@ -51,8 +50,8 @@ vincentyDistance (Position lat1 long1) (Position lat2 long2)
         sinal = cos u1 * cos u2 * sin la / sinsig
         cos2al = 1 - (sinal ^ p2)
         cossigm2 
-            | cos2al == 0 = 0
-            | otherwise = cossig - 2 * sin u1 * sin u2 / cos2al
+            | cos2al == 0   = 0
+            | otherwise     = cossig - 2 * sin u1 * sin u2 / cos2al
 
     stepla :: Double -> Double
     stepla la = ll + (1 - cl) * f * sinal * (sig + cl * sinsig * (cossigm2 + cl * cossig * (-1 + 2 * (cossigm2 ^ p2))))
@@ -64,3 +63,17 @@ trackLength :: [TrackPoint] -> Double
 trackLength track = snd $ foldl step (head track, 0.0) track
     where
     step (prev, dist) point = (point, dist + directDistance prev point)
+    
+trackSpeed :: [TrackPoint] -> [Double]
+trackSpeed track = snd $ mapAccumL step (head track) track
+    where
+    step prev point = (point, speed)
+        where
+        TrackPoint prevtime _ _ = prev
+        TrackPoint currtime _ _ = point
+        timediff = realToFrac (diffUTCTime currtime prevtime)
+        distance = directDistance prev point
+        speed
+            | timediff == 0 && distance == 0    = 0
+            | timediff == 0                     = error "teleport"
+            | otherwise                         = distance / timediff
