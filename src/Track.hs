@@ -64,16 +64,19 @@ trackLength track = snd $ foldl step (head track, 0.0) track
     where
     step (prev, dist) point = (point, dist + directDistance prev point)
     
-trackSpeed :: [TrackPoint] -> [Double]
+trackSpeed :: [TrackPoint] -> [(Double, Double)]
 trackSpeed track = snd $ mapAccumL step (head track) track
     where
-    step prev point = (point, speed)
+    step prev point = (point, (speed, vspeed))
         where
-        TrackPoint prevtime _ _ = prev
-        TrackPoint currtime _ _ = point
+        TrackPoint prevtime _ prevalt = prev
+        TrackPoint currtime _ alt = point
         timediff = realToFrac (diffUTCTime currtime prevtime)
         distance = directDistance prev point
         speed
-            | timediff == 0 && distance == 0    = 0
-            | timediff == 0                     = error "teleport"
-            | otherwise                         = distance / timediff
+            | distance == 0     = 0
+            | timediff == 0     = error "teleport"
+            | otherwise         = distance / timediff
+        vspeed 
+            | alt == prevalt    = 0
+            | otherwise         = (alt - prevalt) / timediff
