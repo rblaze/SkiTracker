@@ -30,8 +30,7 @@ getTime x = timeX
 
 main::IO()
 main = do
-    filename <- liftM head getArgs
-    xml <- ByteString.readFile filename
+    xml <- head `fmap` getArgs >>= ByteString.readFile
     let track = parseTCX xml
     let speeds = trackSpeed track
     let times = map getTime track
