@@ -75,5 +75,5 @@ trackSpeed track = snd $ mapAccumL step (head track) track
         distance = directDistance prev point
         speed
             | timediff == 0 && distance == 0    = 0
-            | timediff == 0                     = error "teleport"
+            | timediff == 0                     = distance / 1.0 -- error ("teleport at " ++ show currtime)
             | otherwise                         = distance / timediff

@@ -1,12 +1,11 @@
 module Main where
 
 import qualified Data.ByteString.Lazy as ByteString
-import Control.Monad (liftM)
 import Data.Time (UTCTime, diffUTCTime)
 import System.Environment
 import Text.Printf
 
-import TCX
+import Parse
 import Track
 
 sustainedSpeed :: Double -> [(UTCTime, Double)] -> [(UTCTime, Double)] -> [Double]
@@ -31,7 +30,7 @@ getTime x = timeX
 main::IO()
 main = do
     xml <- head `fmap` getArgs >>= ByteString.readFile
-    let track = parseTCX xml
+    let track = parseTrack xml
     let speeds = trackSpeed track
     let times = map getTime track
     let maxspeed = maximum speeds
