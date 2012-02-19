@@ -1,7 +1,9 @@
 module Main where
 
 import qualified Data.ByteString.Lazy as ByteString
+import Control.Monad (liftM)
 import Data.Time (UTCTime, diffUTCTime)
+import System.Environment
 import Text.Printf
 
 import TCX
@@ -28,7 +30,8 @@ getTime x = timeX
 
 main::IO()
 main = do
-    xml <- ByteString.readFile "/home/blaze/Dropbox/Ski tracks/ski.tcx"
+    filename <- liftM head getArgs
+    xml <- ByteString.readFile filename
     let track = parseTCX xml
     let speeds = trackSpeed track
     let times = map getTime track
