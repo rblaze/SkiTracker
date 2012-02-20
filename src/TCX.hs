@@ -5,7 +5,6 @@ import Data.Maybe
 import Data.Time (parseTime)
 import System.Locale (defaultTimeLocale)
 import Text.XML.Light
-import Text.XML.Light.Lexer (XmlSource)
 
 import Track
 
@@ -30,7 +29,7 @@ parseTcxPoint x = liftM3 TrackPoint time pos alt
           readAttr :: Read t => String -> Element -> Maybe t
           readAttr = parseAttr read
 
-parseTCX :: XmlSource t => t -> [TrackPoint]
-parseTCX xml = mapMaybe parseTcxPoint $ findElements pointname root
-    where root = fromJust $ parseXMLDoc xml
-          pointname = (elName root) {qName = "Trackpoint"}
+parseTCX :: Element -> [TrackPoint]
+parseTCX root = mapMaybe parseTcxPoint $ findElements pointname root
+    where
+    pointname = (elName root) {qName = "Trackpoint"}

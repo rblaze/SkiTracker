@@ -2,9 +2,10 @@ module Main where
 
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Time (UTCTime, diffUTCTime)
+import System.Environment
 import Text.Printf
 
-import TCX
+import Parse
 import Track
 
 sustainedSpeed :: Double -> [(UTCTime, Double)] -> [(UTCTime, Double)] -> [Double]
@@ -52,8 +53,8 @@ printRes (dir, count, time, start, dalt, elev, tracklen, trackdirect)
 
 main::IO()
 main = do
-    xml <- ByteString.readFile "/home/blaze/Dropbox/Ski tracks/ski.tcx"
-    let track = parseTCX xml
+    xml <- head `fmap` getArgs >>= ByteString.readFile
+    let track = parseTrack xml
     let speeds = trackSpeed track
     let times = map getTime track
     let maxspeed = maximum (fst $ unzip speeds)
