@@ -22,49 +22,68 @@ sustainedSpeed interval state points@(x:xs)
     endTime = fst $ last state
     prevTime = fst $ if length state > 1 then last $ init state else x
 
-sigChar :: Double -> Char
-sigChar x
-    | x < 0     = 'V'
-    | x == 0    = '='
-    | otherwise = '^'  
+data TVA = TVA UTCTime PointShift Double Double
+    deriving (Show)
 
-vfilter :: (TrackPoint, TrackPoint, Int, Double, Double) -> [(TrackPoint, Double)] -> [(Char, Int, Double, String, Double, Double, Double, Double)]
-vfilter (start, end, count, tracklen, dir) track
-    | null track                    = [ retpoint ]
-    | signum dir == signum vspeed   = vfilter (start, point, count + 1, tracklen + seglen, dir) xs
-    | otherwise                     = retpoint : vfilter (end, point, 1, seglen, vspeed) xs
+trackVector :: [TrackPoint] -> [TVA]
+trackVector [] = []
+trackVector [_] = []
+trackVector (x:xs) = TVA time1 shift (speed * 3.6) dalt : trackVector xs
     where
-    retpoint = (sigChar dir, count, tracktime, show stime, ealt - salt, salt, tracklen, trackdirect)
-    TrackPoint stime _ salt = start
-    TrackPoint etime _ ealt = end
-    ((point, vspeed) : xs) = track
-    trackdirect = directDistance start end
-    tracktime = realToFrac $ diffUTCTime etime stime
-    seglen = directDistance end point
+    TrackPoint time1 pos1 alt1 = x
+    TrackPoint time2 pos2 alt2 = head xs
+    shift = vincentyFormulae pos1 pos2
+    speed = directDistance x (head xs) / timediff
+    dalt = alt2 - alt1
+    timediff
+        | time1 /= time2    = realToFrac (diffUTCTime time2 time1)
+        | otherwise         = 0.5
 
-getTime :: TrackPoint -> UTCTime
-getTime x = timeX
+printTVA :: TVA -> String
+printTVA t = printf "%.1f\t%.2f\t%.1f\t%.1f\t%s\n" speed (azm * 180 / pi) dist dalt (show time)
     where
-    TrackPoint timeX _ _ = x
+    TVA time (PointShift dist razm) speed dalt = t
+    azm
+        | razm >= 0     = razm
+        | otherwise     = 2 * pi + razm
 
-printRes :: (Char, Int, Double, String, Double, Double, Double, Double) -> String
-printRes (dir, count, time, start, dalt, elev, tracklen, trackdirect) 
-    = printf "%c %d\t%f\t%.1f\t%.0f\t%.2f\t%.2f\t%.1f\t%s\n" dir count time dalt elev tracklen trackdirect (tracklen * 3.6 / time) start
+data Avg = Avg UTCTime Double Double Double Double
+    deriving (Show)
+
+trackDiff :: [TrackPoint] -> [Avg]
+trackDiff (a:rest@(b:c:d:e:f:_)) = Avg ftime avgspeed avgazm speeddiff azmdiff : trackDiff rest
+    where
+    TrackPoint atime apos _ = a
+    TrackPoint etime epos _ = e
+    TrackPoint ftime fpos _ = f
+    avgspeed = (directDistance a b + directDistance b c +
+        directDistance c d + directDistance d e) / timeae
+    timeae = realToFrac (diffUTCTime etime atime)
+    avgazm = azimuth $ vincentyFormulae apos epos
+    timefe = realToFrac (diffUTCTime ftime etime)
+    speedfe = if timefe /= 0 then directDistance e f / timefe else 0
+    speeddiff = abs (speedfe - avgspeed) / avgspeed
+    azmfe = azimuth $ vincentyFormulae epos fpos
+    adiff = abs (azmfe - avgazm)
+    azmdiff = if adiff < pi then adiff else 2 * pi - adiff
+trackDiff _ = []
+
+printDiff :: Avg -> String
+printDiff t = printf "%c%.1f\t%.2f\t%.2f\t%.2f\t%s\n" mark (aspeed * 3.6) (azm * 180 / pi) dspeed dazm (show time)
+    where
+    Avg time aspeed aazm dspeed dazm = t
+    azm
+        | aazm >= 0     = aazm
+        | otherwise     = 2 * pi + aazm
+    mark = if dspeed < 0.1 && dazm < 0.175 then '*' else ' '
 
 main::IO()
 main = do
     xml <- head `fmap` getArgs >>= ByteString.readFile
     let track = parseTrack xml
-    let speeds = trackSpeed track
-    let times = map getTime track
-    let maxspeed = maximum (fst $ unzip speeds)
-    let maxsust = maximum $ sustainedSpeed 10 [] $ zip times (fst $ unzip speeds)
-    let maxascentspeed = maximum $ snd $ unzip speeds 
-    let maxdescentspeed = minimum $ snd $ unzip speeds
+--    let tvas = trackVector track
+    let diffs = trackDiff track
     
     _ <- printf "Total distance %.2f km\n" (trackLength track / 1000)
-    _ <- printf "Max speed %.1f km/h\n" (maxspeed * 3.6)
-    _ <- printf "Max sustained speed %.1f km/h\n" (maxsust * 3.6)
-    _ <- printf "Max ascent speed %.1f m/s\n" maxascentspeed
-    _ <- printf "Max descent speed %.1f m/s\n" (-maxdescentspeed)
-    mapM_ (printf . printRes) $ vfilter (head track, head track, 0, 0, 0) $ zip track (snd $ unzip speeds)
+--    mapM_ (printf . printTVA) tvas
+    mapM_ (printf . printDiff) diffs
