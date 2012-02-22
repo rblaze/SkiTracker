@@ -2,7 +2,7 @@ module Main where
 
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Maybe
-import Data.Time (diffUTCTime)
+import Data.Time (UTCTime, diffUTCTime)
 import System.Environment
 import Text.Printf
 
@@ -94,8 +94,27 @@ longLift track = totalTime > 30
     getTime (TrackPoint time _ _) = time
     totalTime = realToFrac (diffUTCTime (getTime $ last track) (getTime $ head track))
 
-printLift :: [TrackPoint] -> String
-printLift l = show (length l) ++ " " ++ show htime ++ " " ++ show ltime
+data PointInfo = PointInfo { pitime :: UTCTime, piSpeed :: Double, piAzimuth :: Double, piDistance :: Double, piVShift :: Double } 
+
+makeTrackInfo :: [TrackPoint] -> [PointInfo]
+makeTrackInfo track = zipWith makePoint track (tail track)
+    where
+    makePoint (TrackPoint time1 pos1 alt1) (TrackPoint time2 pos2 alt2) =
+            PointInfo time1 speed azm dist vshift
+        where
+        PointShift dist azm = vincentyFormulae pos1 pos2
+        vshift = alt2 - alt1
+        timediff = realToFrac (diffUTCTime time2 time1)
+        speed
+            | timediff == 0     = 0 -- error ("teleport at " ++ show currtime)
+            | otherwise         = dist / timediff
+
+printPoint :: PointInfo -> IO String
+printPoint (PointInfo time speed azm dist vshift) 
+    = printf "%.1f\t%.2f\t%.1f\t%.1f\t%s\n" (speed * 3.6) azm dist vshift (show time)
+
+printLift :: [TrackPoint] -> IO String
+printLift l = printf "%d\t%s\t%s\n" (length l) (show htime) (show ltime)
     where
     getTime (TrackPoint time _ _) = time
     htime = getTime $ head l
@@ -103,11 +122,20 @@ printLift l = show (length l) ++ " " ++ show htime ++ " " ++ show ltime
 
 main::IO()
 main = do
-    xml <- head `fmap` getArgs >>= ByteString.readFile
+    [mode, filename] <- take 2 `fmap` getArgs
+    xml <- ByteString.readFile filename
     let track = parseTrack xml
     let lifts = filter longLift $ (mergeLifts . getLifts) track
     let liftdist = sum $ map trackLength lifts
+    let points = makeTrackInfo track
     
     _ <- printf "Total distance %.2f km\n" (trackLength track / 1000)
-    _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
-    mapM_ (print . printLift) lifts
+    case mode of
+        "lifts" -> do
+            _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
+            mapM_ printLift lifts
+        "track" -> do
+            _ <- printf "speed\tazm\tdist\tvshift\n"
+            mapM_ printPoint points
+        _ ->
+            print "invalid command"
