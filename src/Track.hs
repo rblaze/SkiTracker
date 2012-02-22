@@ -62,15 +62,13 @@ vincentyFormulae (Position lat1 long1) (Position lat2 long2)
         where
         (cos2al, sinsig, cossig, cossigm2, sinal, sig) = precalc la 
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
-        
+
 vincentyDistance :: Position -> Position -> Double
 vincentyDistance pos1 pos2 = distance (vincentyFormulae pos1 pos2)  
-        
+
 trackLength :: [TrackPoint] -> Double
-trackLength track = snd $ foldl step (head track, 0.0) track
-    where
-    step (prev, dist) point = (point, dist + directDistance prev point)
-    
+trackLength track = sum $ zipWith directDistance track (tail track)
+
 trackSpeed :: [TrackPoint] -> [(Double, Double)]
 trackSpeed track = snd $ mapAccumL step (head track) track
     where
