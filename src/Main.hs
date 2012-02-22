@@ -94,13 +94,13 @@ longLift track = totalTime > 30
     getTime (TrackPoint time _ _) = time
     totalTime = realToFrac (diffUTCTime (getTime $ last track) (getTime $ head track))
 
-data PointInfo = PointInfo { pitime :: UTCTime, piSpeed :: Double, piAzimuth :: Double, piDistance :: Double, piVShift :: Double } 
+data PointInfo = PointInfo UTCTime Double Double Double Double Double 
 
 makeTrackInfo :: [TrackPoint] -> [PointInfo]
 makeTrackInfo track = zipWith makePoint track (tail track)
     where
     makePoint (TrackPoint time1 pos1 alt1) (TrackPoint time2 pos2 alt2) =
-            PointInfo time1 speed azm dist vshift
+            PointInfo time1 speed azm alt1 dist vshift
         where
         PointShift dist azm = vincentyFormulae pos1 pos2
         vshift = alt2 - alt1
@@ -110,8 +110,8 @@ makeTrackInfo track = zipWith makePoint track (tail track)
             | otherwise         = dist / timediff
 
 printPoint :: PointInfo -> IO String
-printPoint (PointInfo time speed azm dist vshift) 
-    = printf "%.1f\t%.2f\t%.1f\t%.1f\t%s\n" (speed * 3.6) azm dist vshift (show time)
+printPoint (PointInfo time speed azm alt dist vshift) 
+    = printf "%.1f\t%.2f\t%.0f\t%.1f\t%.1f\t%s\n" (speed * 3.6) azm alt dist vshift (show time)
 
 printLift :: [TrackPoint] -> IO String
 printLift l = printf "%d\t%s\t%s\n" (length l) (show htime) (show ltime)
@@ -135,7 +135,7 @@ main = do
             _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
             mapM_ printLift lifts
         "track" -> do
-            _ <- printf "speed\tazm\tdist\tvshift\n"
+            _ <- printf "speed\tazm\talt\tdist\tvshift\n"
             mapM_ printPoint points
         _ ->
             print "invalid command"
