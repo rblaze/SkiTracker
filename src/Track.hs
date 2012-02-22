@@ -2,7 +2,6 @@ module Track (Position(Position), TrackPoint(TrackPoint), PointShift(PointShift,
         vincentyDistance, vincentyFormulae, directDistance,
         trackLength, trackSpeed) where
 
-import Data.List
 import Data.Ratio ((%))
 import Data.Time (UTCTime, diffUTCTime)
 import Math.Sequence.Converge (convergeTo)
@@ -70,14 +69,14 @@ trackLength :: [TrackPoint] -> Double
 trackLength track = sum $ zipWith directDistance track (tail track)
 
 trackSpeed :: [TrackPoint] -> [(Double, Double)]
-trackSpeed track = snd $ mapAccumL step (head track) track
+trackSpeed track = zipWith mkspeed track (tail track)
     where
-    step prev point = (point, (speed, vspeed))
+    mkspeed t1 t2 = (speed, vspeed)
         where
-        TrackPoint prevtime _ prevalt = prev
-        TrackPoint currtime _ alt = point
+        TrackPoint prevtime _ prevalt = t1
+        TrackPoint currtime _ alt = t2
         timediff = realToFrac (diffUTCTime currtime prevtime)
-        dist = directDistance prev point
+        dist = directDistance t1 t2
         speed
             | dist == 0         = 0
             | timediff == 0     = dist / 1.0 -- error ("teleport at " ++ show currtime)
