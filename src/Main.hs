@@ -1,7 +1,8 @@
 module Main where
 
 import qualified Data.ByteString.Lazy as ByteString
-import Data.Time (UTCTime, diffUTCTime)
+import Data.Maybe
+import Data.Time (diffUTCTime)
 import System.Environment
 import Text.Printf
 
@@ -9,59 +10,104 @@ import Parse
 import Track
 
 isGoodLift :: [TrackPoint] -> Bool
-isGoodLift [_] = True
+isGoodLift [_] = False
 isGoodLift track = speedmatch && dirmatch
     where
-    seqPairs xs = zip xs (tail xs)
+    pointpairs = zip track (tail track)
     getPos (TrackPoint _ pos _) = pos
     getTime (TrackPoint time _ _) = time
+
     avgazm = azimuth $ vincentyFormulae (getPos $ head track) (getPos $ last track)
     checkazm (p1, p2) = azmdiff < 0.1
         where
         azm = azimuth $ vincentyFormulae (getPos p1) (getPos p2)
         adiff = abs (azm - avgazm)
         azmdiff = if adiff < pi then adiff else 2 * pi - adiff
-    dirmatch = all checkazm $ seqPairs track
+    dirmatch = all checkazm pointpairs
+
     totalTime = realToFrac (diffUTCTime (getTime $ last track) (getTime $ head track))
     avgspeed = trackLength track / totalTime
-    checkspeed (p1, p2) = spdiff < 0.1
+    checkspeed (p1, p2) = rspdiff < 0.1 || aspdiff < 1
         where
         tdiff = realToFrac (diffUTCTime (getTime p2) (getTime p1))
         speed = if tdiff /= 0 then directDistance p1 p2 / tdiff else 0
-        spdiff = abs (speed - avgspeed) / avgspeed
-    speedmatch = all checkspeed $ seqPairs track
+        aspdiff = abs (speed - avgspeed)
+        rspdiff = aspdiff / avgspeed
+    speedmatch = all checkspeed pointpairs
 
 data LiftState = LiftState { stCurrent :: [TrackPoint], stLifts :: [[TrackPoint]] }
 
-findLift :: [TrackPoint] -> ([TrackPoint], [TrackPoint])
-findLift track = splitAt 5 stripped 
-    where
-    stripped = until (isGoodLift . take 5) tail track
-
-get' :: LiftState -> [TrackPoint] -> LiftState
-get' s [] = s
-get' s (x:xs) = get' newstate track
-    where
-    newtrack = stCurrent s ++ [x]
-    stillgood = isGoodLift newtrack
-    (start, rest) = findLift (x:xs)
-    newstate
-        | stillgood = s { stCurrent = newtrack }
-        | otherwise = LiftState { stCurrent = start, stLifts = stCurrent s : stLifts s }
-    track = if stillgood then xs else rest
+findLift :: Int -> [TrackPoint] -> Maybe Int
+findLift _ [] = Nothing
+findLift offset track@(_:xs)
+    | isGoodLift (take 5 track) = Just offset
+    | otherwise                 = findLift (offset + 1) xs             
 
 getLifts :: [TrackPoint] -> [[TrackPoint]]
-getLifts track = stLifts $ get' LiftState { stCurrent = start, stLifts = [[]] } rest
+getLifts track = stLifts $ findNext LiftState { stCurrent = tstart, stLifts = [] } trest
     where
-    (start, rest) = findLift track
+    lift_track = drop (fromJust $ findLift 0 track) track
+    (tstart, trest) = splitAt 5 lift_track
+
+    findNext :: LiftState -> [TrackPoint] -> LiftState
+    findNext s [] = s
+    findNext s points@(x:xs) = findNext newstate newtrack
+        where
+        newlift = stCurrent s ++ [x]
+        stillgood = isGoodLift newlift
+        n = findLift 0 (x:xs)
+        (pause, cont) = splitAt (fromJust n) points
+        (start, rest) = splitAt 5 cont 
+        newstate
+            | stillgood     = s { stCurrent = newlift }
+            | isNothing n   = s
+            | otherwise = LiftState { stCurrent = start, stLifts = stLifts s ++ [stCurrent s, pause]}
+        newtrack
+            | stillgood     = xs
+            | isNothing n   = []
+            | otherwise     = rest
+
+mergeLifts :: [[TrackPoint]] -> [[TrackPoint]]
+mergeLifts [] = error "p2"
+mergeLifts [_] = error "p1"
+mergeLifts [t,_] = [t]
+mergeLifts (track1:pause:track2:rest)
+-- if time between tracks is short and speeds are almost same - merge tracks
+    | tdiff < 60 && abs (spd1 - spd2) / spd1 < 0.2   = mergeLifts (combined : rest)
+    | otherwise     = track1 : mergeLifts (track2 : rest)
+    where
+    combined = track1 ++ pause ++ track2
+    getTime (TrackPoint time _ _) = time
+    t1stime = getTime $ head track1
+    t1etime = getTime $ last track1
+    t2stime = getTime $ head track2
+    t2etime = getTime $ last track2
+    tdiff = realToFrac (diffUTCTime t2stime t1etime)
+    time1 = realToFrac (diffUTCTime t1etime t1stime)
+    time2 = realToFrac (diffUTCTime t2etime t2stime)
+    spd1 = trackLength track1 / time1
+    spd2 = trackLength track2 / time2
+
+longLift :: [TrackPoint] -> Bool
+longLift track = totalTime > 30
+    where
+    getTime (TrackPoint time _ _) = time
+    totalTime = realToFrac (diffUTCTime (getTime $ last track) (getTime $ head track))
 
 printLift :: [TrackPoint] -> String
-printLift l = show (length l) ++ " " ++ show l
+printLift l = show (length l) ++ " " ++ show htime ++ " " ++ show ltime
+    where
+    getTime (TrackPoint time _ _) = time
+    htime = getTime $ head l
+    ltime = getTime $ last l 
 
 main::IO()
 main = do
     xml <- head `fmap` getArgs >>= ByteString.readFile
     let track = parseTrack xml
+    let lifts = filter longLift $ (mergeLifts . getLifts) track
+    let liftdist = sum $ map trackLength lifts
     
     _ <- printf "Total distance %.2f km\n" (trackLength track / 1000)
-    mapM_ (print . printLift) $ getLifts track
+    _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
+    mapM_ (print . printLift) lifts
