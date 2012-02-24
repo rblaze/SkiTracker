@@ -11,7 +11,7 @@ import Track
 parseGpxPoint :: Element -> Maybe TrackPoint
 parseGpxPoint x = liftM3 TrackPoint time pos alt
     where alt = parseChild read "ele"
-          time = join $ parseChild (parseTime defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ") "time"
+          time = join $ parseChild (parseTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ") "time"
           pos = liftM2 Position lat lon
 
           lon = readAttrRad "lon"

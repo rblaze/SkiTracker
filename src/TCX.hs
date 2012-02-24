@@ -11,7 +11,7 @@ import Track
 parseTcxPoint :: Element -> Maybe TrackPoint
 parseTcxPoint x = liftM3 TrackPoint time pos alt
     where alt = readAttr "AltitudeMeters" x
-          time = join $ parseAttr (parseTime defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ") "Time" x
+          time = join $ parseAttr (parseTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ") "Time" x
           pos = join $ liftM parsePosition $ getChild "Position" x  
 
           parsePosition :: Element -> Maybe Position
