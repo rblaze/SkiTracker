@@ -1,16 +1,16 @@
-module Track (Position(Position), TrackPoint(TrackPoint), PointShift(PointShift, distance, azimuth), 
-        vincentyDistance, vincentyFormulae, directDistance,
-        trackLength, trackSpeed) where
+module Track (Position(Position), TrackPoint(TrackPoint, tpTime, tpPos, tpAlt),
+        PointShift(PointShift, psDistance, psAzimuth), 
+        vincentyDistance, vincentyFormulae, directDistance, trackLength) where
 
 import Data.Ratio ((%))
-import Data.Time (UTCTime, diffUTCTime)
+import Data.Time (UTCTime)
 import Math.Sequence.Converge (convergeTo)
 
 data Position = Position Double Double  -- Lat Long
     deriving (Show)
-data TrackPoint = TrackPoint UTCTime Position Double -- Altitude
+data TrackPoint = TrackPoint { tpTime :: UTCTime, tpPos :: Position, tpAlt :: Double }
     deriving (Show)
-data PointShift = PointShift { distance :: Double, azimuth :: Double }
+data PointShift = PointShift { psDistance :: Double, psAzimuth :: Double }
     deriving (Show)
 
 p2 :: Int
@@ -18,12 +18,6 @@ p2 = 2
 
 round2mm :: Double -> Double
 round2mm x = fromRational (round (x * 1000) % 1000)    
-
-directDistance :: TrackPoint -> TrackPoint -> Double
-directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sqrt (altdist ^ p2 + landdist ^ p2)
-    where
-    altdist = alt1 - alt2
-    landdist = vincentyDistance pos1 pos2 
 
 vincentyFormulae :: Position -> Position -> PointShift
 vincentyFormulae (Position lat1 long1) (Position lat2 long2) 
@@ -63,24 +57,13 @@ vincentyFormulae (Position lat1 long1) (Position lat2 long2)
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
 
 vincentyDistance :: Position -> Position -> Double
-vincentyDistance pos1 pos2 = distance (vincentyFormulae pos1 pos2)  
+vincentyDistance pos1 pos2 = psDistance (vincentyFormulae pos1 pos2)  
+
+directDistance :: TrackPoint -> TrackPoint -> Double
+directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sqrt (altdist ^ p2 + landdist ^ p2)
+    where
+    altdist = alt1 - alt2
+    landdist = vincentyDistance pos1 pos2 
 
 trackLength :: [TrackPoint] -> Double
 trackLength track = sum $ zipWith directDistance track (tail track)
-
-trackSpeed :: [TrackPoint] -> [(Double, Double)]
-trackSpeed track = zipWith mkspeed track (tail track)
-    where
-    mkspeed t1 t2 = (speed, vspeed)
-        where
-        TrackPoint prevtime _ prevalt = t1
-        TrackPoint currtime _ alt = t2
-        timediff = realToFrac (diffUTCTime currtime prevtime)
-        dist = directDistance t1 t2
-        speed
-            | dist == 0         = 0
-            | timediff == 0     = dist / 1.0 -- error ("teleport at " ++ show currtime)
-            | otherwise         = dist / timediff
-        vspeed 
-            | alt == prevalt    = 0
-            | otherwise         = (alt - prevalt) / timediff
