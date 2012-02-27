@@ -8,6 +8,7 @@ import Test.QuickCheck
 import Data.Time
 
 import Track
+import Maps
 
 main :: IO()
 main = defaultMain tests
@@ -24,6 +25,15 @@ main = defaultMain tests
         testGroup "Distance" [
             testProperty "Vertical" testDistVert,
             testProperty "Horizontal" testDistHoriz
+        ],
+        testGroup "Google" [
+            testCase "encode -179.9832104" testEncodeM179pBlah,
+            testCase "encode 38.5" testEncode38p5,
+            testCase "encode -120.2" testEncodeM120p2,
+            testCase "encode 2.2" testEncode2p2,
+            testCase "encode -0.75" testEncodeM0p75,
+            testCase "encode 2.552" testEncode2p552,
+            testCase "encode -5.503" testEncodeM5p503
         ]
      ]
 
@@ -93,4 +103,24 @@ testVinc6 = vincentyDistance p1 p2 @?= 55478.459
     where
     p1 = Position 0 (g2r 144.424867)
     p2 = Position 0 (g2r 143.92649552)
-    
+
+testEncodeM179pBlah :: Assertion
+testEncodeM179pBlah = encodeNumber (-179.9832104 ) @?= "`~oia@"
+
+testEncode38p5 :: Assertion
+testEncode38p5 = encodeNumber 38.5 @?= "_p~iF"
+
+testEncodeM120p2 :: Assertion
+testEncodeM120p2 = encodeNumber (-120.2) @?= "~ps|U"
+
+testEncode2p2 :: Assertion
+testEncode2p2 = encodeNumber 2.2 @?= "_ulL"
+
+testEncodeM0p75 :: Assertion
+testEncodeM0p75 = encodeNumber (-0.75) @?= "nnqC"
+
+testEncode2p552 :: Assertion
+testEncode2p552 = encodeNumber 2.552 @?= "_mqN"
+
+testEncodeM5p503 :: Assertion
+testEncodeM5p503 = encodeNumber (-5.503) @?= "vxq`@"

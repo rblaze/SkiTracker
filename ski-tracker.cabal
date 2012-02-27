@@ -12,7 +12,8 @@ executable ski-tracker
                    bytestring,
                    time,
                    old-locale,
-                   converge
+                   converge,
+                   download-curl
   ghc-options:     -Wall
 
 test-suite TestMain
