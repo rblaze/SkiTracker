@@ -1,5 +1,4 @@
-
-module Maps(getMap, encodeNumber) where
+module Maps(getMap, encodeTrack) where
 
 import qualified Data.ByteString.Lazy as BS
 import Network.Curl.Download.Lazy
@@ -22,8 +21,13 @@ encodeNumber num = map (\x -> chr (x + 63)) values
     mkchunks 0 = []
     mkchunks x = (x .&. 0x1F) : mkchunks (x `shiftR` 5)
 
-encodeCoord :: Double -> String
-encodeCoord x = encodeNumber (x / pi * 180.0)
+encodeTrack :: [TrackPoint] -> String
+encodeTrack track = concat $ zipWith encodeDiff (zeroPos : track) track 
+    where
+    zeroPos = (head track) { tpPos = Position 0 0 }
+    encodeCoord x = encodeNumber (x / pi * 180.0)
+    encodePoint x y = encodeCoord x ++ encodeCoord y
+    encodeDiff (TrackPoint _ (Position x1 y1) _) (TrackPoint _ (Position x2 y2) _) = encodePoint (x2 - x1) (y2 - y1)
 
 makeRequest :: [[TrackPoint]] -> String
 makeRequest points = trace (show (length url) ++ " " ++ url) url
@@ -32,11 +36,7 @@ makeRequest points = trace (show (length url) ++ " " ++ url) url
     url = baseurl ++ concatMap mkline points
     mapsize :: (Int, Int)
     mapsize = (640, 640)
-    mkline lift = printf "&path=enc:%s" coord 
-        where
-        Position sx sy = tpPos (head lift)
-        Position ex ey = tpPos (last lift)
-        coord = concatMap encodeCoord [sx, sy, ex - sx, ey - sy]
+    mkline lift = printf "&path=enc:%s" $ encodeTrack [head lift, last lift] 
 
 getMap :: [[TrackPoint]] -> IO BS.ByteString
 getMap lifts = liftM getData stream
