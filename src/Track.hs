@@ -7,9 +7,9 @@ import Data.Time (UTCTime)
 import Math.Sequence.Converge (convergeTo)
 
 data Position = Position Double Double  -- Lat Long
-    deriving (Show)
+    deriving (Show, Eq)
 data TrackPoint = TrackPoint { tpTime :: UTCTime, tpPos :: Position, tpAlt :: Double }
-    deriving (Show)
+    deriving (Show, Eq)
 data PointShift = PointShift { psDistance :: Double, psAzimuth :: Double }
     deriving (Show)
 
