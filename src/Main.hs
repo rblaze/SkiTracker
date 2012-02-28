@@ -1,37 +1,59 @@
 module Main where
 
-import qualified Data.ByteString.Lazy as ByteString
+import Prelude hiding (foldr, sum)
+
+import qualified Data.ByteString.Lazy as BS
 import Data.Time (UTCTime, diffUTCTime)
-import Data.Maybe
-import Data.List
+import Data.List (groupBy)
+import Data.Foldable (Foldable, foldr, sum)
+import Data.Function (on)
 import System.Environment
 import Text.Printf
 
+import qualified Queue as Q
 import Parse
 import Track
+import Maps
 
 import Debug.Trace
 
-data VS = VS { vsAzimuth :: Double, vsDirectDistance :: Double, vsSpeed :: Double }
-    deriving (Show)
+data SegmentType = Idle | Track | Lift deriving (Enum, Show, Eq)
+data SegmentInfo = SegmentInfo { siTime :: UTCTime, siType :: SegmentType, siStart :: Position,
+        siEnd :: Position, siAlt :: Double, siAzimuth :: Double, siHDiff :: Double, siVDiff :: Double,
+        siDistance :: Double, siDuration :: Double, siSpeed :: Double } 
 
-getShift :: TrackPoint -> TrackPoint -> VS
-getShift p1 p2 = VS azimuth distance speed
-    where
-    TrackPoint time1 pos1 alt1 = p1
-    TrackPoint time2 pos2 alt2 = p2
-    PointShift landdist azimuth = vincentyFormulae pos1 pos2
-    altdist = alt2 - alt1
-    distance = sqrt (altdist ^ (2 :: Int) + landdist ^ (2 :: Int))
-    time = realToFrac (diffUTCTime time2 time1)
-    speed = distance / time
+timeDelta :: UTCTime -> UTCTime -> Double
+timeDelta t1 t2 = realToFrac (diffUTCTime t1 t2)
 
-isGoodLift :: [TrackPoint] -> Bool
-isGoodLift [_] = False
-isGoodLift track = trace (show (speedStdDev / avgspeed) ++ " " ++ show azmdev ++ " " ++ show (tpTime $ head track)) $ speedmatch && dirmatch
+makeTrackInfo :: [TrackPoint] -> [SegmentInfo]
+makeTrackInfo track = zipWith mkinfo track (tail track)
     where
-    stddev :: [Double] -> Double
-    stddev diffs = sqrt (sum (map (^(2::Int)) diffs) / fromIntegral (length diffs))
+    mkinfo :: TrackPoint -> TrackPoint -> SegmentInfo
+    mkinfo (TrackPoint time1 pos1 alt1) (TrackPoint time2 pos2 alt2)
+        = SegmentInfo time1 Idle pos1 pos2 alt1 azimuth hdist vdiff totaldist timediff speed
+        where
+        PointShift hdist azimuth = vincentyFormulae pos1 pos2
+        vdiff = alt2 - alt1
+        totaldist = sqrt (hdist ^ (2 :: Int) + vdiff ^ (2 :: Int))
+        timediff = timeDelta time2 time1
+        speed = totaldist / timediff
+
+printSegment :: SegmentInfo -> IO String
+printSegment p 
+    = printf "%.1f\t%.2f\t%.0f\t%.1f\t%.1f\t%s\n" (siSpeed p * 3.6) (siAzimuth p) (siAlt p) (siDistance p) (siVDiff p) (show $ siTime p)
+
+isGoodLift :: Q.Queue SegmentInfo -> Bool
+isGoodLift track
+    | Q.length track < 5    = False 
+    | otherwise             = speedmatch && dirmatch
+    where
+    dbgstring :: String
+    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
+    stddev :: Foldable a => a Double -> Double
+    stddev diffs = sqrt (qsum / len)
+        where
+        (qsum, len) = foldr f (0, 0) diffs
+        f v (s, l) = (s + v ^ (2 :: Int), l + 1) 
     azmdiff :: Double -> Double -> Double
     azmdiff a1 a2
         | diff > pi     = 2 * pi - diff
@@ -39,120 +61,74 @@ isGoodLift track = trace (show (speedStdDev / avgspeed) ++ " " ++ show azmdev ++
         | otherwise     = diff
         where diff = a2 - a1
 
-    params = zipWith getShift track (tail track)
-
-    totalTime = realToFrac (diffUTCTime (tpTime $ last track) (tpTime $ head track))
-    avgspeed = sum (map vsDirectDistance params) / totalTime
-    speedStdDev = stddev $ map (\x -> avgspeed - vsSpeed x) params
+    totalTime = sum (fmap siDuration track)
+    avgspeed = sum (fmap siDistance track) / totalTime
+    speedStdDev = stddev $ fmap (\x -> avgspeed - siSpeed x) track
     speedmatch = (speedStdDev / avgspeed) < 0.3
 
-    avgazm = psAzimuth $ vincentyFormulae (tpPos $ head track) (tpPos $ last track)
-    azmdev = stddev $ map (azmdiff avgazm . vsAzimuth) params
-    dirmatch = azmdev < 0.1
+    avgazm = psAzimuth $ vincentyFormulae (siStart $ Q.head track) (siEnd $ Q.last track)
+    azmdev = stddev $ fmap (azmdiff avgazm . siAzimuth) track
+    dirmatch = azmdev < 0.14
 
-data LiftState = LiftState { stCurrent :: [TrackPoint], stLifts :: [[TrackPoint]] }
+fillInterval :: Double -> Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
+fillInterval _ start [] = (start, []) 
+fillInterval duration start rest@(x:xs)
+    | Q.length start >= 5 && timeDelta (siTime $ Q.last start) (siTime $ Q.head start) >= duration
+                    = (start, rest)
+    | otherwise     = fillInterval duration (Q.push start x) xs
 
-findLift :: [TrackPoint] -> ([TrackPoint], [TrackPoint])
-findLift track
-    | length track < 5 || isNothing idx     = ([], [])
-    | goodstart                             = (firstmin, drop (length firstmin) track)
-    | otherwise                             = findLift $ tail track
+findLift :: [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
+findLift track = (reverse pr, li, re)
     where
-    goodstart = isGoodLift firstmin
-    minute :: TrackPoint -> Bool
-    minute point = realToFrac (diffUTCTime (tpTime point) (tpTime $ head track)) >= (60.0 :: Double)
-    idx = findIndex minute track
-    firstmin = take (max 5 (1 + fromJust idx)) track
+    -- pr is reversed
+    (pr, li, re) = step [] Q.empty track 
+    step :: [SegmentInfo] -> Q.Queue SegmentInfo -> [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
+    step p l r
+        | isGoodLift lift   = (p, lift, rest)
+        | otherwise         = step (Q.head lift : p) (Q.pop lift) rest
+        where
+        (lift, rest) = fillInterval 60 l r
 
-expandLift :: ([TrackPoint], [TrackPoint]) -> ([TrackPoint], [TrackPoint])
-expandLift (lift, track)
-    | null track || null lift   = (lift, track)
-    | isGoodLift newlift        = expandLift (newlift, rest)
+expandLift :: Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
+expandLift lift track
+    | Q.null lift || null track = (lift, track)
+    | isGoodLift newlift        = expandLift newlift rest
     | otherwise                 = (lift, track)
     where
     (point:rest) = track
-    newlift = lift ++ [point]
+    newlift = Q.push lift point
 
-firstLift :: [TrackPoint] -> ([TrackPoint], [TrackPoint])
-firstLift track = expandLift $ findLift track
-
-getLifts :: [TrackPoint] -> [[TrackPoint]]
-getLifts track
-    | null lift     = []
-    | otherwise     = lift : getLifts rest
+markLifts :: [SegmentInfo] -> [SegmentInfo]
+markLifts [] = []
+markLifts track = intro ++ exlift ++ markLifts rest 
     where
-    (lift, rest) = firstLift track
+    (intro, lift', rest') = findLift track
+    (lift, rest) = expandLift lift' rest'
+    exlift = map (\x -> x { siType = Lift }) $ Q.toList lift
 
-{--
-
-getLifts :: [TrackPoint] -> [[TrackPoint]]
-getLifts track = stLifts $ findNext LiftState { stCurrent = tstart, stLifts = [] } trest
-    where
-    lift_track = drop (fromJust $ findLift 0 track) track
-    (tstart, trest) = splitAt 5 lift_track
-
-    findNext :: LiftState -> [TrackPoint] -> LiftState
-    findNext s [] = s
-    findNext s points@(x:xs) = findNext newstate newtrack
-        where
-        newlift = stCurrent s ++ [x]
-        stillgood = isGoodLift newlift
-        n = findLift 0 (x:xs)
-        (pause, cont) = splitAt (fromJust n) points
-        (start, rest) = splitAt 5 cont 
-        newstate
-            | stillgood     = s { stCurrent = newlift }
-            | isNothing n   = s
-            | otherwise = LiftState { stCurrent = start, stLifts = stLifts s ++ [stCurrent s, pause]}
-        newtrack
-            | stillgood     = xs
-            | isNothing n   = []
-            | otherwise     = rest
-
---}
-
-data PointInfo = PointInfo UTCTime Double Double Double Double Double 
-
-makeTrackInfo :: [TrackPoint] -> [PointInfo]
-makeTrackInfo track = zipWith makePoint track (tail track)
-    where
-    makePoint (TrackPoint time1 pos1 alt1) (TrackPoint time2 pos2 alt2) =
-            PointInfo time1 speed azm alt1 dist vshift
-        where
-        PointShift dist azm = vincentyFormulae pos1 pos2
-        vshift = alt2 - alt1
-        timediff = realToFrac (diffUTCTime time2 time1)
-        speed
-            | timediff == 0     = 0 -- error ("teleport at " ++ show currtime)
-            | otherwise         = dist / timediff
-
-printPoint :: PointInfo -> IO String
-printPoint (PointInfo time speed azm alt dist vshift) 
-    = printf "%.1f\t%.2f\t%.0f\t%.1f\t%.1f\t%s\n" (speed * 3.6) azm alt dist vshift (show time)
-
-printLift :: [TrackPoint] -> String
-printLift l = printf "%d\t%s\t%s\n" (length l) (show htime) (show ltime)
-    where
-    getTime (TrackPoint time _ _) = time
-    htime = getTime $ head l
-    ltime = getTime $ last l 
+printLift :: [SegmentInfo] -> String
+printLift l = printf "%d\t%s\t%s\n" (length l) (show $ siTime (head l)) (show $ siTime (last l))
 
 main::IO()
 main = do
     [mode, filename] <- take 2 `fmap` getArgs
-    xml <- ByteString.readFile filename
-    let track = parseTrack xml
-    let lifts = getLifts track
-    let liftdist = sum $ map trackLength lifts
-    let points = makeTrackInfo track
+    xml <- BS.readFile filename
+    let gpstrack = parseTrack xml
+    let track = makeTrackInfo gpstrack
+    let marked = markLifts track
+    let parts = groupBy ((==) `on` siType) marked
+    let lifts = filter (\x -> siType (head x) == Lift) parts
+    let liftdist = sum $ map (sum . fmap siDistance) lifts
     
-    _ <- printf "Total distance %.2f km\n" (trackLength track / 1000)
+    _ <- printf "Total distance %.2f km\n" $ sum (map siDistance track) / 1000
     case mode of
         "lifts" -> do
             _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
             mapM_ (printf . printLift) lifts
+--            pic <- Maps.getMap lifts
+--            ByteString.writeFile "mypic.png" pic
         "track" -> do
             _ <- printf "speed\tazm\talt\tdist\tvshift\n"
-            mapM_ printPoint points
+            mapM_ printSegment track
         _ ->
             print "invalid command"
