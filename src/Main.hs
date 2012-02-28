@@ -85,6 +85,7 @@ findLift track = (reverse pr, li, re)
     step :: [SegmentInfo] -> Q.Queue SegmentInfo -> [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
     step p l r
         | isGoodLift lift   = (p, lift, rest)
+        | Q.null lift      = (p, lift, rest)
         | otherwise         = step (Q.head lift : p) (Q.pop lift) rest
         where
         (lift, rest) = fillInterval 60 l r
