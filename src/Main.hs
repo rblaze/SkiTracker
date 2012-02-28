@@ -80,7 +80,6 @@ fillInterval duration start rest@(x:xs)
 findLift :: [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
 findLift track = (reverse pr, li, re)
     where
-    -- pr is reversed
     (pr, li, re) = step [] Q.empty track 
     step :: [SegmentInfo] -> Q.Queue SegmentInfo -> [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
     step p l r
@@ -110,6 +109,56 @@ markLifts track = intro ++ exlift ++ markLifts rest
 printLift :: [SegmentInfo] -> String
 printLift l = printf "%d\t%s\t%s\n" (length l) (show $ siTime (head l)) (show $ siTime (last l))
 
+mkHtml :: [[SegmentInfo]] -> String
+mkHtml lifts = header ++ path ++ footer
+    where
+    path = mkpath (head lifts)
+    mkpath :: [SegmentInfo] -> String
+    mkpath track = coords ++ vardescr
+        where
+        Position sx sy = siStart (head track)
+        Position ex ey = siEnd (last track)
+        coords = printf "var flightPlanCoordinates = [ new google.maps.LatLng(%f, %f), new google.maps.LatLng(%f, %f)];\n" (sx / pi * 180) (sy / pi * 180) (ex / pi * 180) (ey / pi * 180)
+        vardescr = "  var flightPath = new google.maps.Polyline({ \
+\    path: flightPlanCoordinates,  \n\
+\    strokeColor: \"#FF0000\",  \n\
+\    strokeOpacity: 1.0,  \n\
+\    strokeWeight: 2  \n\
+\  });  \n\
+\  \n\
+\  flightPath.setMap(map); \n"
+
+    header = "<!DOCTYPE html>\n\
+\<html>  \n\
+\<head>  \n\
+\<title>Example: Simple</title>  \n\
+\<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\"/>  \n\
+\<meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />  \n\
+\<style type=\"text/css\">  \n\
+\  html { height: 100% }  \n\
+\  body { height: 100%; margin: 0; padding: 0 }  \n\
+\  #map_canvas { height: 100% }  \n\
+\</style>  \n\
+\<script type=\"text/javascript\"  \n\
+\  src=\"http://maps.googleapis.com/maps/api/js?key=AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM&sensor=false\">  \n\
+\</script>  \n\
+\<script type=\"text/javascript\">  \n\
+\  function initialize() {  \n\
+\    var myLatlng = new google.maps.LatLng(45.512296, 6.697502);  \n\
+\    var myOptions = {  \n\
+\      zoom: 13,  \n\
+\      center: myLatlng,  \n\
+\      mapTypeId: google.maps.MapTypeId.TERRAIN  \n\
+\    }  \n\
+\    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n"
+    footer = "  }  \n\
+\</script>  \n\
+\</head>  \n\
+\<body onload=\"initialize()\">  \n\
+\  <div id=\"map_canvas\"></div>  \n\
+\</body>  \n\
+\</html>"
+
 main::IO()
 main = do
     [mode, filename] <- take 2 `fmap` getArgs
@@ -126,6 +175,8 @@ main = do
         "lifts" -> do
             _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
             mapM_ (printf . printLift) lifts
+            let html = mkHtml lifts
+            writeFile "track.html" html
 --            pic <- Maps.getMap lifts
 --            ByteString.writeFile "mypic.png" pic
         "track" -> do
