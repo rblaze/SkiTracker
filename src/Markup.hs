@@ -1,13 +1,16 @@
 module Markup(SegmentType(..), SegmentInfo(..), makeTrackInfo, markLifts, maxSustSpeed) where
 
-import Prelude hiding (foldr, sum)
+import Prelude hiding (foldr, sum, any)
 
-import Data.Foldable (Foldable, foldr, sum)
+import Data.Foldable (Foldable, foldr, sum, any)
 import Data.Time (UTCTime)
 
 import qualified Queue as Q
 import Track
 import Util
+
+import Text.Printf
+import Debug.Trace
 
 data SegmentType = Idle | Track | Lift deriving (Enum, Show, Eq)
 data SegmentInfo = SegmentInfo { siTime :: UTCTime, siType :: SegmentType, siStart :: Position,
@@ -29,11 +32,14 @@ makeTrackInfo track = zipWith mkinfo track (tail track)
 
 isGoodLift :: Q.Queue SegmentInfo -> Bool
 isGoodLift track
-    | Q.length track < 5    = False 
-    | otherwise             = speedmatch && dirmatch
+    | Q.null track          = False
+            -- little hack for GPS losing signal
+            -- any interval longer than 1 minute with more then 60 m altitude gain counts as lift
+    | Q.length track < 5    = trace (dbgstring ++ ' ' : show vdiff) ${--any (\s -> siDuration s > 60) track &&--} vdiff > 60
+    | otherwise             = trace dbgstring $ speedmatch && dirmatch
     where
---    dbgstring :: String
---    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
+    dbgstring :: String
+    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
     stddev :: Foldable a => a Double -> Double
     stddev diffs = sqrt (qsum / len)
         where
@@ -54,11 +60,13 @@ isGoodLift track
     avgazm = psAzimuth $ vincentyFormulae (siStart $ Q.head track) (siEnd $ Q.last track)
     azmdev = stddev $ fmap (azmdiff avgazm . siAzimuth) track
     dirmatch = azmdev < 0.14
+    
+    vdiff = siVDiff (Q.last track) + siAlt (Q.last track) - siAlt (Q.head track)
 
 fillInterval :: Int -> Double -> Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
 fillInterval _ _ start [] = (start, []) 
 fillInterval minlen duration start rest@(x:xs)
-    | Q.length start >= minlen && timeDelta (siTime $ Q.last start) (siTime $ Q.head start) >= duration
+    | not (Q.null start) && siDuration (Q.last start) + timeDelta (siTime $ Q.last start) (siTime $ Q.head start) >= duration
                     = (start, rest)
     | otherwise     = fillInterval minlen duration (Q.push start x) xs
 
@@ -72,7 +80,7 @@ findLift track = (reverse pr, li, re)
         | Q.null lift      = (p, lift, rest)
         | otherwise         = step (Q.head lift : p) (Q.pop lift) rest
         where
-        (lift, rest) = fillInterval 5 60 l r
+        (lift, rest) = fillInterval 5 90 l r
 
 expandLift :: Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
 expandLift lift track
