@@ -54,7 +54,8 @@ getMapPage paths = header ++ path ++ footer
 \    strokeWeight: 2  \n\
 \  });  \n\
 \  \n\
-\  %s.setMap(map); \n" prefix prefix color prefix
+\  %s.setMap(map); \n\
+\  google.maps.event.addListener(%s, 'click', pathClickEvent);\n" prefix prefix color prefix prefix
 
     mkpath :: [SegmentInfo] -> (Int, String) -> (Int, String)
     mkpath track (num, text) = (num + 1, text ++ route ++ marker)
@@ -105,6 +106,9 @@ getMapPage paths = header ++ path ++ footer
 \      mapTypeId: google.maps.MapTypeId.TERRAIN  \n\
 \    }  \n\
 \    var info = new google.maps.InfoWindow({});  \n\
+\    function pathClickEvent(event) {   \n\
+\        info.setContent(event.latLng.toString()); info.setPosition(event.latLng); info.open(map);  \n\
+\    };  \n\
 \    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n" (printPosition center)
 
     footer = "  }  \n\
