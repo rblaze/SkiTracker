@@ -57,7 +57,7 @@ vincentyFormulae (Position lat1 long1) (Position lat2 long2)
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
 
 vincentyDistance :: Position -> Position -> Double
-vincentyDistance pos1 pos2 = psDistance (vincentyFormulae pos1 pos2)  
+vincentyDistance pos1 pos2 = psDistance (vincentyFormulae pos1 pos2)
 
 directDistance :: TrackPoint -> TrackPoint -> Double
 directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sqrt (altdist ^ p2 + landdist ^ p2)

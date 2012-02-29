@@ -13,7 +13,6 @@ executable ski-tracker
                    time,
                    old-locale,
                    converge,
-                   download-curl,
                    mtl
   ghc-options:     -Wall
 

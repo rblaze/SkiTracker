@@ -8,7 +8,6 @@ import Test.QuickCheck
 import Data.Time
 
 import Track
-import Maps
 
 main :: IO()
 main = defaultMain tests
@@ -25,9 +24,6 @@ main = defaultMain tests
         testGroup "Distance" [
             testProperty "Vertical" testDistVert,
             testProperty "Horizontal" testDistHoriz
-        ],
-        testGroup "Google" [
-            testCase "encode polyline" testPolyline
         ]
      ]
 
@@ -97,12 +93,3 @@ testVinc6 = vincentyDistance p1 p2 @?= 55478.459
     where
     p1 = Position 0 (g2r 144.424867)
     p2 = Position 0 (g2r 143.92649552)
-
-testPolyline :: Assertion
-testPolyline = encodeTrack line @?= "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
-    where
-    line = [point1, point2, point3]
-    point1 = TrackPoint zeroTime (Position (g2r 38.5) (g2r (-120.2))) 0
-    point2 = TrackPoint zeroTime (Position (g2r 40.7) (g2r (-120.95))) 0
-    point3 = TrackPoint zeroTime (Position (g2r 43.252) (g2r (-126.453))) 0
-        
