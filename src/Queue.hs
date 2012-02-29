@@ -21,17 +21,17 @@ push :: Queue a -> a -> Queue a
 push (Queue qin qout) v = Queue (v:qin) qout
 
 pop :: Queue a -> Queue a
-pop (Queue [] []) = error "Queue underrun" 
+pop (Queue [] []) = error "Queue underrun (pop)" 
 pop (Queue qin (_:xs)) = Queue qin xs
 pop (Queue qin []) = pop (Queue [] (reverse qin))
 
 head :: Queue a -> a
-head (Queue [] []) = error "Queue underrun"
+head (Queue [] []) = error "Queue underrun (head)"
 head (Queue _ (x:_)) = x
 head (Queue qin []) = Prelude.last qin
 
 last :: Queue a -> a
-last (Queue [] []) = error "Queue underrun"
+last (Queue [] []) = error "Queue underrun (last)"
 last (Queue (x:_) _) = x
 last (Queue [] qout) = Prelude.last qout
 
