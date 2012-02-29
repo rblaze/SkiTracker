@@ -111,10 +111,29 @@ printLift :: [SegmentInfo] -> String
 printLift l = printf "%d\t%s\t%s\n" (length l) (show $ siTime (head l)) (show $ siTime (last l))
 
 mkHtml :: [[SegmentInfo]] -> String
-mkHtml lifts = header ++ path ++ footer
+mkHtml paths = header ++ path ++ footer
     where
     path = snd $ flip execState (0, "") $
-        forM_ lifts $ \lift -> modify (mkpath lift)
+        forM_ paths $ \track -> modify (mkpath track)
+
+    getSiMmxy s (minx, maxx, miny, maxy) = (min minx posx, max maxx posx, min miny posy, max maxy posy)
+        where Position posx posy = siStart s 
+    getMmxy (minx1, maxx1, miny1, maxy1) (minx2, maxx2, miny2, maxy2) 
+        = (min minx1 minx2, max maxx1 maxx2, min miny1 miny2, max maxy1 maxy2)
+    center = Position ((maxx + minx) / 2) ((maxy + miny) / 2)
+        where
+        (minx, maxx, miny, maxy) = foldr1 getMmxy $ map (foldr getSiMmxy (2 * pi, -2 * pi, 2 * pi, -2 * pi)) paths
+
+    printPosition :: Position -> String
+    printPosition (Position x y) = printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)
+
+    setMarker :: Int -> String -> Position -> String
+    setMarker num title pos = printf "    var markerPos%d = %s;  \n\  
+\    var marker%d = new google.maps.Marker({   \n\
+\      position: markerPos%d,  \n\
+\      map: map,  \n\
+\      title:\"%s\"  \n\
+\  });\n" num (printPosition pos) num num title
 
     printPath :: Int -> String -> [Position] -> String
     printPath num color points = coords ++ vardescr
@@ -122,7 +141,7 @@ mkHtml lifts = header ++ path ++ footer
         prefix = "path" ++ show num
         coords = concat [printf "var %sCoordinates = [" prefix, intercalate "," pointlist, "];\n"]
         pointlist :: [String]
-        pointlist = map (\(Position x y) -> printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)) points
+        pointlist = map printPosition points
         vardescr = printf "  var %s = new google.maps.Polyline({ \
 \    path: %sCoordinates,  \n\
 \    strokeColor: \"%s\",  \n\
@@ -139,29 +158,30 @@ mkHtml lifts = header ++ path ++ footer
             else siStart (head track) : map siEnd track  
         output = printPath num color points
 
-    header = "<!DOCTYPE html>\n\
+    header = printf "<!DOCTYPE html>\n\
 \<html>  \n\
 \<head>  \n\
 \<title>Example: Simple</title>  \n\
 \<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\"/>  \n\
 \<meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />  \n\
 \<style type=\"text/css\">  \n\
-\  html { height: 100% }  \n\
-\  body { height: 100%; margin: 0; padding: 0 }  \n\
-\  #map_canvas { height: 100% }  \n\
+\  html { height: 100%% }  \n\
+\  body { height: 100%%; margin: 0; padding: 0 }  \n\
+\  #map_canvas { height: 100%% }  \n\
 \</style>  \n\
 \<script type=\"text/javascript\"  \n\
 \  src=\"http://maps.googleapis.com/maps/api/js?key=AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM&sensor=false\">  \n\
 \</script>  \n\
 \<script type=\"text/javascript\">  \n\
 \  function initialize() {  \n\
-\    var myLatlng = new google.maps.LatLng(45.512296, 6.697502);  \n\
+\    var myLatlng = %s;  \n\
 \    var myOptions = {  \n\
-\      zoom: 13,  \n\
+\      zoom: 14,  \n\
 \      center: myLatlng,  \n\
 \      mapTypeId: google.maps.MapTypeId.TERRAIN  \n\
 \    }  \n\
-\    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n"
+\    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n" (printPosition center)
+
     footer = "  }  \n\
 \</script>  \n\
 \</head>  \n\
