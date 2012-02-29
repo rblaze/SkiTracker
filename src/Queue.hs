@@ -1,4 +1,3 @@
-
 module Queue where
 
 import Data.Foldable

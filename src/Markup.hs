@@ -1,4 +1,4 @@
-module Markup(SegmentType(..), SegmentInfo(..), makeTrackInfo, markLifts) where
+module Markup(SegmentType(..), SegmentInfo(..), makeTrackInfo, markLifts, maxSustSpeed) where
 
 import Prelude hiding (foldr, sum)
 
@@ -55,12 +55,12 @@ isGoodLift track
     azmdev = stddev $ fmap (azmdiff avgazm . siAzimuth) track
     dirmatch = azmdev < 0.14
 
-fillInterval :: Double -> Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
-fillInterval _ start [] = (start, []) 
-fillInterval duration start rest@(x:xs)
-    | Q.length start >= 5 && timeDelta (siTime $ Q.last start) (siTime $ Q.head start) >= duration
+fillInterval :: Int -> Double -> Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
+fillInterval _ _ start [] = (start, []) 
+fillInterval minlen duration start rest@(x:xs)
+    | Q.length start >= minlen && timeDelta (siTime $ Q.last start) (siTime $ Q.head start) >= duration
                     = (start, rest)
-    | otherwise     = fillInterval duration (Q.push start x) xs
+    | otherwise     = fillInterval minlen duration (Q.push start x) xs
 
 findLift :: [SegmentInfo] -> ([SegmentInfo], Q.Queue SegmentInfo, [SegmentInfo])
 findLift track = (reverse pr, li, re)
@@ -72,7 +72,7 @@ findLift track = (reverse pr, li, re)
         | Q.null lift      = (p, lift, rest)
         | otherwise         = step (Q.head lift : p) (Q.pop lift) rest
         where
-        (lift, rest) = fillInterval 60 l r
+        (lift, rest) = fillInterval 5 60 l r
 
 expandLift :: Q.Queue SegmentInfo -> [SegmentInfo] -> (Q.Queue SegmentInfo, [SegmentInfo])
 expandLift lift track
@@ -90,3 +90,13 @@ markLifts track = intro ++ exlift ++ markLifts rest
     (intro, lift', rest') = findLift track
     (lift, rest) = expandLift lift' rest'
     exlift = map (\x -> x { siType = Lift }) $ Q.toList lift
+
+maxSustSpeed :: Double -> [SegmentInfo] -> Double
+maxSustSpeed duration track = maximum (getMins Q.empty track)
+    where
+    minspeed :: Q.Queue SegmentInfo -> Double
+    minspeed = foldr (\a b -> min (siSpeed a) b) 1000 -- unlikely there will be hypersonic speeds
+    getMins :: Q.Queue SegmentInfo -> [SegmentInfo] -> [Double]
+    getMins _ [] = []
+    getMins q tr = minspeed fillq : getMins (Q.pop fillq) rest
+        where (fillq, rest) = fillInterval 1 duration q tr

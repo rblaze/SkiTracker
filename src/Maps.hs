@@ -76,9 +76,12 @@ getMapPage paths = header ++ path ++ footer
         liftinfo = printf "Lift %d: %s - %s (%d min)<br>Length %.2f km, altitude change %.0f m" 
             num (phm stime) (phm etime) (tracktime `div` 60)
             (sum (map siDistance track) / 1000) (sum (map siVDiff track)) 
-        trackinfo = printf "Track %d: %s - %s (%d h %d min %d sec)<br>Length %.2f km, altitude drop %.0f m" 
+        trackinfo = printf "Track %d: %s - %s (%d h %d min %d sec)<br>Length %.2f km, altitude drop %.0f m<br>\
+                \Max speed %.1f km/h, max sustained speed %.1f km/h" 
             num (phm stime) (phm etime) (tracktime `div` 3600) (tracktime `rem` 3600 `div` 60) (tracktime `rem` 60)
-            (sum (map siDistance track) / 1000) (negate $ sum $ map siVDiff track) 
+            (sum (map siDistance track) / 1000) (negate $ sum $ map siVDiff track)
+            (3.6 * maximum (map siSpeed track)) (3.6 * maxSustSpeed 10 track)
+    
     header = printf "<!DOCTYPE html>\n\
 \<html>  \n\
 \<head>  \n\
