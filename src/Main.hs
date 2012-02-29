@@ -4,18 +4,19 @@ import Prelude hiding (foldr, sum)
 
 import qualified Data.ByteString.Lazy as BS
 import Data.Time (UTCTime, diffUTCTime)
-import Data.List (groupBy)
+import Data.List (groupBy, intercalate)
 import Data.Foldable (Foldable, foldr, sum)
 import Data.Function (on)
 import System.Environment
 import Text.Printf
+import Control.Monad.State hiding (lift)
 
 import qualified Queue as Q
 import Parse
 import Track
-import Maps
+--import Maps
 
-import Debug.Trace
+--import Debug.Trace
 
 data SegmentType = Idle | Track | Lift deriving (Enum, Show, Eq)
 data SegmentInfo = SegmentInfo { siTime :: UTCTime, siType :: SegmentType, siStart :: Position,
@@ -47,8 +48,8 @@ isGoodLift track
     | Q.length track < 5    = False 
     | otherwise             = speedmatch && dirmatch
     where
-    dbgstring :: String
-    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
+--    dbgstring :: String
+--    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
     stddev :: Foldable a => a Double -> Double
     stddev diffs = sqrt (qsum / len)
         where
@@ -112,21 +113,28 @@ printLift l = printf "%d\t%s\t%s\n" (length l) (show $ siTime (head l)) (show $ 
 mkHtml :: [[SegmentInfo]] -> String
 mkHtml lifts = header ++ path ++ footer
     where
-    path = mkpath (head lifts)
-    mkpath :: [SegmentInfo] -> String
-    mkpath track = coords ++ vardescr
+    path = snd $ flip execState (0, "") $
+        forM_ lifts $ \lift -> modify (mkpath lift)
+
+    printPath :: Int -> [Position] -> String
+    printPath num points = coords ++ vardescr
         where
-        Position sx sy = siStart (head track)
-        Position ex ey = siEnd (last track)
-        coords = printf "var flightPlanCoordinates = [ new google.maps.LatLng(%f, %f), new google.maps.LatLng(%f, %f)];\n" (sx / pi * 180) (sy / pi * 180) (ex / pi * 180) (ey / pi * 180)
-        vardescr = "  var flightPath = new google.maps.Polyline({ \
-\    path: flightPlanCoordinates,  \n\
+        prefix = "path" ++ show num
+        coords = concat [printf "var %sCoordinates = [" prefix, intercalate "," pointlist, "];\n"]
+        pointlist :: [String]
+        pointlist = map (\(Position x y) -> printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)) points
+        vardescr = printf "  var %s = new google.maps.Polyline({ \
+\    path: %sCoordinates,  \n\
 \    strokeColor: \"#FF0000\",  \n\
-\    strokeOpacity: 1.0,  \n\
 \    strokeWeight: 2  \n\
 \  });  \n\
 \  \n\
-\  flightPath.setMap(map); \n"
+\  %s.setMap(map); \n" prefix prefix prefix
+
+    mkpath :: [SegmentInfo] -> (Int, String) -> (Int, String)
+    mkpath track (num, text) = (num + 1, text ++ output)
+        where
+        output = printPath num [siStart $ head track, siEnd $ last track]
 
     header = "<!DOCTYPE html>\n\
 \<html>  \n\
