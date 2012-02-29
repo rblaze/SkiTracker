@@ -72,16 +72,21 @@ getMapPage paths = header ++ path ++ footer
         phm = formatTime defaultTimeLocale "%X"
         stime = siTime $ head track
         etime = siTime $ last track
-        tracktime :: Int
-        tracktime = fst $ properFraction (timeDelta etime stime + siDuration (last track))
+        toInt :: Double -> Int
+        toInt x = fst $ properFraction x
+        tracktime = siDuration (last track) + timeDelta etime stime
+        tracklen = sum (map siDistance track)
         liftinfo = printf "Lift %d: %s - %s (%d min)<br>Length %.2f km, altitude change %.0f m" 
-            num (phm stime) (phm etime) (tracktime `div` 60)
+            num (phm stime) (phm etime) (toInt tracktime `div` 60)
             (sum (map siDistance track) / 1000) (sum (map siVDiff track)) 
         trackinfo = printf "Track %d: %s - %s (%d h %d min %d sec)<br>Length %.2f km, altitude drop %.0f m<br>\
-                \Max speed %.1f km/h, max sustained speed %.1f km/h" 
-            num (phm stime) (phm etime) (tracktime `div` 3600) (tracktime `rem` 3600 `div` 60) (tracktime `rem` 60)
-            (sum (map siDistance track) / 1000) (negate $ sum $ map siVDiff track)
-            (3.6 * maximum (map siSpeed track)) (3.6 * maxSustSpeed 10 track)
+                \Max speed %.1f km/h, average speed %.1f km/h<br>\
+                \Max sustained speed %.1f km/h" 
+            num (phm stime) (phm etime) (toInt tracktime `div` 3600) 
+            (toInt tracktime `rem` 3600 `div` 60) (toInt tracktime `rem` 60)
+            (tracklen / 1000) (negate $ sum $ map siVDiff track)
+            (3.6 * maximum (map siSpeed track)) (3.6 * tracklen / tracktime) 
+            (3.6 * maxSustSpeed 10 track)
     
     header = printf "<!DOCTYPE html>\n\
 \<html>  \n\
@@ -107,7 +112,7 @@ getMapPage paths = header ++ path ++ footer
 \    }  \n\
 \    var info = new google.maps.InfoWindow({});  \n\
 \    function pathClickEvent(event) {   \n\
-\        info.setContent(event.latLng.toString()); info.setPosition(event.latLng); info.open(map);  \n\
+\        info.setContent(event.latLng.toString()); info.open(map); info.setPosition(event.latLng);  \n\
 \    };  \n\
 \    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n" (printPosition center)
 
