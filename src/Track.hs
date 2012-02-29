@@ -2,9 +2,10 @@ module Track (Position(Position), TrackPoint(TrackPoint, tpTime, tpPos, tpAlt),
         PointShift(PointShift, psDistance, psAzimuth), 
         vincentyDistance, vincentyFormulae, directDistance, trackLength) where
 
-import Data.Ratio ((%))
 import Data.Time (UTCTime)
 import Math.Sequence.Converge (convergeTo)
+
+import Util
 
 data Position = Position Double Double  -- Lat Long
     deriving (Show, Eq)
@@ -12,12 +13,6 @@ data TrackPoint = TrackPoint { tpTime :: UTCTime, tpPos :: Position, tpAlt :: Do
     deriving (Show, Eq)
 data PointShift = PointShift { psDistance :: Double, psAzimuth :: Double }
     deriving (Show)
-
-p2 :: Int
-p2 = 2
-
-round2mm :: Double -> Double
-round2mm x = fromRational (round (x * 1000) % 1000)    
 
 vincentyFormulae :: Position -> Position -> PointShift
 vincentyFormulae (Position lat1 long1) (Position lat2 long2) 

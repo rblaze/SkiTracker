@@ -1,20 +1,18 @@
-module Markup where
+module Markup(SegmentType(..), SegmentInfo(..), makeTrackInfo, markLifts) where
 
 import Prelude hiding (foldr, sum)
 
 import Data.Foldable (Foldable, foldr, sum)
-import Data.Time (UTCTime, diffUTCTime)
+import Data.Time (UTCTime)
 
 import qualified Queue as Q
 import Track
+import Util
 
 data SegmentType = Idle | Track | Lift deriving (Enum, Show, Eq)
 data SegmentInfo = SegmentInfo { siTime :: UTCTime, siType :: SegmentType, siStart :: Position,
         siEnd :: Position, siAlt :: Double, siAzimuth :: Double, siHDiff :: Double, siVDiff :: Double,
         siDistance :: Double, siDuration :: Double, siSpeed :: Double } 
-
-timeDelta :: UTCTime -> UTCTime -> Double
-timeDelta t1 t2 = realToFrac (diffUTCTime t1 t2)
 
 makeTrackInfo :: [TrackPoint] -> [SegmentInfo]
 makeTrackInfo track = zipWith mkinfo track (tail track)
