@@ -116,8 +116,8 @@ mkHtml lifts = header ++ path ++ footer
     path = snd $ flip execState (0, "") $
         forM_ lifts $ \lift -> modify (mkpath lift)
 
-    printPath :: Int -> [Position] -> String
-    printPath num points = coords ++ vardescr
+    printPath :: Int -> String -> [Position] -> String
+    printPath num color points = coords ++ vardescr
         where
         prefix = "path" ++ show num
         coords = concat [printf "var %sCoordinates = [" prefix, intercalate "," pointlist, "];\n"]
@@ -125,16 +125,19 @@ mkHtml lifts = header ++ path ++ footer
         pointlist = map (\(Position x y) -> printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)) points
         vardescr = printf "  var %s = new google.maps.Polyline({ \
 \    path: %sCoordinates,  \n\
-\    strokeColor: \"#FF0000\",  \n\
+\    strokeColor: \"%s\",  \n\
 \    strokeWeight: 2  \n\
 \  });  \n\
 \  \n\
-\  %s.setMap(map); \n" prefix prefix prefix
+\  %s.setMap(map); \n" prefix prefix color prefix
 
     mkpath :: [SegmentInfo] -> (Int, String) -> (Int, String)
     mkpath track (num, text) = (num + 1, text ++ output)
         where
-        output = printPath num [siStart $ head track, siEnd $ last track]
+        color = if siType (head track) == Lift then "#FF0000" else "#0000FF"
+        points = if siType (head track) == Lift then [siStart $ head track, siEnd $ last track]
+            else siStart (head track) : map siEnd track  
+        output = printPath num color points
 
     header = "<!DOCTYPE html>\n\
 \<html>  \n\
@@ -183,7 +186,7 @@ main = do
         "lifts" -> do
             _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
             mapM_ (printf . printLift) lifts
-            let html = mkHtml lifts
+            let html = mkHtml parts
             writeFile "track.html" html
 --            pic <- Maps.getMap lifts
 --            ByteString.writeFile "mypic.png" pic
