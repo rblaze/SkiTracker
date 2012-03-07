@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Maps(getMapPage) where
 
 import Control.Monad.State
@@ -6,13 +8,20 @@ import Data.Time.Format(formatTime)
 import System.Locale (defaultTimeLocale)
 import Text.Printf
 
+import Text.Blaze.Html5 ((!))
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+
 import Markup
 import Track
 import Util
 
-getMapPage :: [[SegmentInfo]] -> String
-getMapPage paths = header ++ path ++ footer
+getMapScript :: [[SegmentInfo]] -> H.Html
+getMapScript paths = do
+        H.script ! A.type_ "text/javascript" ! A.src "http://maps.googleapis.com/maps/api/js?key=AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM&sensor=false" $ ""
+        H.script ! A.type_ "text/javascript" $ H.preEscapedString mapscript  
     where
+    mapscript = header ++ path ++ "}"
     path = snd $ flip execState (0, "") $
         forM_ paths $ \track -> modify (mkpath track)
 
@@ -27,19 +36,20 @@ getMapPage paths = header ++ path ++ footer
     printPosition :: Position -> String
     printPosition (Position x y) = printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)
 
-    setMarker :: Int -> String -> Maybe String -> Maybe String -> Position -> String
+    toInt :: Double -> Int
+    toInt x = fst $ properFraction x
+
+    setMarker :: Int -> String -> String -> String -> Position -> String
     setMarker num title icon infotext pos = printf "    var markerPos%d = %s;  \n\  
 \    var marker%d = new google.maps.Marker({   \n\
 \      position: markerPos%d,  \n\
 \      map: map,  \n\
-\      %s\
+\      icon: '%s',\n\
 \      title:\"%s\"  \n\
-\  });\n\
-\  %s" num (printPosition pos) num num icontext title event
-        where
-        icontext = maybe "" (printf "icon: \'%s\',\n") icon
-        event = maybe "" (\s -> printf "google.maps.event.addListener(marker%d, 'click', function() { \
-            \ info.setContent('%s'); info.open(map, marker%d); });  \n" num s num) infotext
+\    });\n\
+\    google.maps.event.addListener(marker%d, 'click', function() { \n\
+\      info.setContent('%s'); info.open(map, marker%d);\n\
+\    });\n" num (printPosition pos) num num icon title num infotext num
 
     printPath :: Int -> String -> [Position] -> String
     printPath num color points = coords ++ vardescr
@@ -58,22 +68,18 @@ getMapPage paths = header ++ path ++ footer
 \  google.maps.event.addListener(%s, 'click', pathClickEvent);\n" prefix prefix color prefix prefix
 
     mkpath :: [SegmentInfo] -> (Int, String) -> (Int, String)
-    mkpath track (num, text) = (num + 1, text ++ route ++ marker)
+    mkpath track (num, text) = (num + 1, concat [text, route, marker])
         where
         (icon, title, color, infotext, points) = case siType (head track) of
-            Lift -> (Just "skilift.png", "Lift " ++ show num, "#FF0000",
-                Just liftinfo,
+            Lift -> ("static/skilift.png", "Lift " ++ show num, "#FF0000", liftinfo,
                 [siStart $ head track, siEnd $ last track])
-            _ -> (Just "snowboarding.png", "Track " ++ show num, "#0000FF",
-                Just trackinfo,
+            _ -> ("static/snowboarding.png", "Track " ++ show num, "#0000FF", trackinfo,
                 siStart (head track) : map siEnd track) 
         route = printPath num color points
         marker = setMarker num title icon infotext (siStart (head track))
         phm = formatTime defaultTimeLocale "%X"
         stime = siTime $ head track
         etime = siTime $ last track
-        toInt :: Double -> Int
-        toInt x = fst $ properFraction x
         tracktime = siDuration (last track) + timeDelta etime stime
         tracklen = sum (map siDistance track)
         liftinfo = printf "Lift %d: %s - %s (%d min)<br>Length %.2f km, altitude change %.0f m" 
@@ -88,39 +94,37 @@ getMapPage paths = header ++ path ++ footer
             (3.6 * maximum (map siSpeed track)) (3.6 * tracklen / tracktime) 
             (3.6 * maxSustSpeed 10 track)
     
-    header = printf "<!DOCTYPE html>\n\
-\<html>  \n\
-\<head>  \n\
-\<title>Example: Simple</title>  \n\
-\<meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\"/>  \n\
-\<meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />  \n\
-\<style type=\"text/css\">  \n\
-\  html { height: 100%% }  \n\
-\  body { height: 100%%; margin: 0; padding: 0 }  \n\
-\  #map_canvas { height: 100%% }  \n\
-\</style>  \n\
-\<script type=\"text/javascript\"  \n\
-\  src=\"http://maps.googleapis.com/maps/api/js?key=AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM&sensor=false\">  \n\
-\</script>  \n\
-\<script type=\"text/javascript\">  \n\
-\  function initialize() {  \n\
+    summary :: String
+    summary = printf "Total track time %d h %d min %d sec<br>Total distance %.1f km" hour minute sec dist
+        where
+        dist = sum (map (sum . map siDistance) paths) / 1000
+        tracktime = siDuration (last $ last paths) + timeDelta (siTime $ last $ last paths) (siTime $ head $ head paths)
+        hour = toInt tracktime `div` 3600 
+        minute = toInt tracktime `rem` 3600 `div` 60
+        sec = toInt tracktime `rem` 60
+    
+    header = printf "function initialize() {  \n\
 \    var myLatlng = %s;  \n\
 \    var myOptions = {  \n\
 \      zoom: 14,  \n\
 \      center: myLatlng,  \n\
 \      mapTypeId: google.maps.MapTypeId.TERRAIN  \n\
 \    }  \n\
-\    var info = new google.maps.InfoWindow({});  \n\
+\    var info = new google.maps.InfoWindow({ content: '%s' });  \n\
 \    function pathClickEvent(event) {   \n\
 \        info.setContent(event.latLng.toString()); info.open(map); info.setPosition(event.latLng);  \n\
 \    };  \n\
-\    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);  \n" (printPosition center)
+\    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);\n\
+\    var trackStart = %s;\n\
+\    info.open(map); info.setPosition(trackStart);\n" (printPosition center) summary (printPosition $ siStart $ head $ head paths)
 
-    footer = "  }  \n\
-\</script>  \n\
-\</head>  \n\
-\<body onload=\"initialize()\">  \n\
-\  <div id=\"map_canvas\"></div>  \n\
-\</body>  \n\
-\</html>"
-
+getMapPage :: [[SegmentInfo]] -> H.Html
+getMapPage track = doc
+    where
+    doc = H.docTypeHtml $ do
+        H.head $ do
+            H.title "sample"
+            H.meta ! A.name "viewport" ! A.content "initial-scale=1.0, user-scalable=no"
+            H.style ! A.type_ "text/css" $ "html { height: 100% } body { height: 100%; margin: 0; padding: 0 } #map_canvas { height: 100% }"
+            getMapScript track
+        H.body ! A.onload "initialize()" $ H.div ! A.id "map_canvas" $ "" 

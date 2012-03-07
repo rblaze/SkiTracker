@@ -13,7 +13,11 @@ executable ski-tracker
                    time,
                    old-locale,
                    converge,
-                   mtl
+                   mtl,
+                   happstack-lite,
+                   blaze-html,
+                   text,
+                   transformers
   ghc-options:     -Wall
 
 test-suite TestMain

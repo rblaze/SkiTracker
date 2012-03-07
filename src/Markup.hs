@@ -1,16 +1,15 @@
 module Markup(SegmentType(..), SegmentInfo(..), makeTrackInfo, markLifts, maxSustSpeed) where
 
-import Prelude hiding (foldr, sum, any)
+import Prelude hiding (foldr, sum)
 
-import Data.Foldable (Foldable, foldr, sum, any)
+import Data.Foldable (Foldable, foldr, sum)
 import Data.Time (UTCTime)
 
 import qualified Queue as Q
 import Track
 import Util
 
-import Text.Printf
-import Debug.Trace
+--import Text.Printf
 
 data SegmentType = Idle | Track | Lift deriving (Enum, Show, Eq)
 data SegmentInfo = SegmentInfo { siTime :: UTCTime, siType :: SegmentType, siStart :: Position,
@@ -35,11 +34,11 @@ isGoodLift track
     | Q.null track          = False
             -- little hack for GPS losing signal
             -- any interval longer than 1 minute with more then 60 m altitude gain counts as lift
-    | Q.length track < 5    = trace (dbgstring ++ ' ' : show vdiff) ${--any (\s -> siDuration s > 60) track &&--} vdiff > 60
-    | otherwise             = trace dbgstring $ speedmatch && dirmatch
+    | Q.length track < 5    = vdiff > 60
+    | otherwise             = speedmatch && dirmatch
     where
-    dbgstring :: String
-    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
+--    dbgstring :: String
+--    dbgstring = printf "%0.2f %0.2f %s %s" (speedStdDev / avgspeed) azmdev (show (siTime $ Q.head track)) (show (siTime $ Q.last track))
     stddev :: Foldable a => a Double -> Double
     stddev diffs = sqrt (qsum / len)
         where

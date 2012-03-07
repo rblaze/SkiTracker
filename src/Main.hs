@@ -4,8 +4,10 @@ import qualified Data.ByteString.Lazy as BS
 import Data.List (groupBy)
 import Data.Function (on)
 import System.Environment
+import Text.Blaze.Renderer.Pretty
 import Text.Printf
 
+import AppServer
 import Parse
 import Markup
 import Maps
@@ -19,8 +21,8 @@ printSegment p
 printLift :: [SegmentInfo] -> String
 printLift l = printf "%d\t%s\t%s\n" (length l) (show $ siTime (head l)) (show $ siTime (last l))
 
-main::IO()
-main = do
+localMain :: IO ()
+localMain = do
     [mode, filename] <- take 2 `fmap` getArgs
     xml <- BS.readFile filename
     let gpstrack = parseTrack xml
@@ -36,7 +38,7 @@ main = do
             _ <- printf "Lift distance %.2f km\n" (liftdist / 1000)
             mapM_ (printf . printLift) lifts
             let html = getMapPage parts
-            writeFile "track.html" html
+            writeFile "track.html" $ renderHtml html
 --            pic <- Maps.getMap lifts
 --            ByteString.writeFile "mypic.png" pic
         "track" -> do
@@ -44,3 +46,10 @@ main = do
             mapM_ printSegment track
         _ ->
             print "invalid command"
+
+main::IO()
+main = do
+    mode <- head `fmap` getArgs
+    case mode of
+        "appserver" -> appServerMain
+        _ -> localMain
