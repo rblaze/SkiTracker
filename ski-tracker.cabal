@@ -17,7 +17,9 @@ executable ski-tracker
                    happstack-lite,
                    blaze-html,
                    text,
-                   transformers
+                   transformers,
+                   cryptohash,
+                   directory
   ghc-options:     -Wall
 
 test-suite TestMain
