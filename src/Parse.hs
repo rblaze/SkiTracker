@@ -16,12 +16,13 @@ filterPoints (x:xs) = x : filterPoints rest
     rest = dropWhile sametime xs
     sametime point = tpTime x == tpTime point
 
+processTrack :: Maybe Element -> String -> [TrackPoint]
+processTrack (Just root) "gpx" = parseGPX root
+processTrack (Just root) "TrainingCenterDatabase" = parseTCX root
+processTrack _ _ = error "unsupported data format"
+
 parseTrack :: XmlSource t => t -> [TrackPoint]
-parseTrack xml = filterPoints track
+parseTrack xml = filterPoints $ processTrack root name 
     where
-    track
-        | name == "gpx"                     = parseGPX root
-        | name == "TrainingCenterDatabase"  = parseTCX root
-        | otherwise                         = error "unsupported data format"
-    root = fromJust $ parseXMLDoc xml
-    name = qName $ elName root
+    root = parseXMLDoc xml
+    name = qName $ elName (fromJust root)
