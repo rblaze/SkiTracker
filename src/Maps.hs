@@ -71,9 +71,9 @@ getMapScript paths = do
     mkpath track (num, text) = (num + 1, concat [text, route, marker])
         where
         (icon, title, color, infotext, points) = case siType (head track) of
-            Lift -> ("static/skilift.png", "Lift " ++ show num, "#FF0000", liftinfo,
+            Lift -> ("/static/skilift.png", "Lift " ++ show num, "#FF0000", liftinfo,
                 [siStart $ head track, siEnd $ last track])
-            _ -> ("static/snowboarding.png", "Track " ++ show num, "#0000FF", trackinfo,
+            _ -> ("/static/snowboarding.png", "Track " ++ show num, "#0000FF", trackinfo,
                 siStart (head track) : map siEnd track) 
         route = printPath num color points
         marker = setMarker num title icon infotext (siStart (head track))
