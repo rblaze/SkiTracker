@@ -2,20 +2,21 @@
 
 module AppServer(appServerMain) where
 
-import Control.Monad.IO.Class
+import Control.Monad (join)
+import Control.Monad.IO.Class (liftIO)
 import Data.Function (on)
 import Data.List (groupBy)
+import Data.String (fromString)
 import Happstack.Lite
 import System.Directory
 import Text.Blaze.Html5 (Html, (!), form, input, toHtml)
 import Text.Blaze.Html5.Attributes (action, enctype, name, type_, value)
 import Text.Printf
+import qualified Control.Exception as E 
 import qualified Crypto.Hash.MD5 as MD5
 import qualified Data.ByteString as BS
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
-
---import Happstack.Server.SURI
 
 import Maps
 import Markup
@@ -63,7 +64,7 @@ trackPage = msum [ uploadForm, saveTrack, showTrack ]
     uploadForm = do
         method GET
         nullDir
-        ok $ template "upload form" $
+        trace "Showing form" $ ok $ template "upload form" $
             form ! action "/track" ! enctype "multipart/form-data" ! A.method "POST" $ do
                 input ! type_ "file" ! name "track"
                 H.br
@@ -73,13 +74,28 @@ trackPage = msum [ uploadForm, saveTrack, showTrack ]
     saveTrack = do
         method POST
         nullDir
-        
+
         (tmpFile, _, _) <- lookFile "track"
         xml <- liftIO $ BS.readFile tmpFile
-        let trackid = trace tmpFile $ createTrackId xml
 
-        liftIO $ renameFile tmpFile ("data/" ++ trackid)
-        trace "Saving track" $ seeOther ("track/" ++ trackid)  $ toResponse $ H.preEscapedString "redirecting to your track map"
+        let trackid = createTrackId xml
+
+        join (liftIO $ E.catch (do
+            renameFile tmpFile ("data/" ++ trackid)
+            return (mkresp ("track/" ++ trackid))
+           ) 
+           (\(E.ErrorCall e) -> return (mkerr e)))
+        where
+        mkresp :: String -> ServerPart Response
+        mkresp trackpath = trace "Saving track" $ seeOther trackpath $ 
+                template "Redirecting..." $ do
+                    H.toHtml ("Loading your track map" :: String)
+                    H.br
+                    H.toHtml ("Click " :: String)
+                    H.a ! A.href (fromString trackpath) $ H.toHtml ("here" :: String)
+                    H.toHtml (" if automatic redirection fails" :: String)
+        mkerr :: String -> ServerPart Response
+        mkerr msg = ok $ template "Parse error" $ H.toHtml (printf "%s" msg :: String)
 
     showTrack :: ServerPart Response
     showTrack = do
