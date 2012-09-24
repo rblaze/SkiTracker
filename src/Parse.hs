@@ -1,6 +1,8 @@
 module Parse (parseTrack) where
 
 import Data.Maybe (fromJust)
+import Data.List (groupBy)
+import Data.Function (on)
 import Text.XML.Light
 import Text.XML.Light.Lexer (XmlSource)
 
@@ -9,12 +11,7 @@ import TCX
 import Track
 
 filterPoints :: [TrackPoint] -> [TrackPoint]
-filterPoints [] = []
-filterPoints [x] = [x]
-filterPoints (x:xs) = x : filterPoints rest
-    where
-    rest = dropWhile sametime xs
-    sametime point = tpTime x == tpTime point
+filterPoints xs = map head $ groupBy ((==) `on` tpTime) xs
 
 processTrack :: Maybe Element -> String -> [TrackPoint]
 processTrack (Just root) "gpx" = parseGPX root

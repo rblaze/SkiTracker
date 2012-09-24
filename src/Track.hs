@@ -1,5 +1,4 @@
-module Track (Position(Position), TrackPoint(TrackPoint, tpTime, tpPos, tpAlt),
-        PointShift(PointShift, psDistance, psAzimuth), 
+module Track (Position(..), TrackPoint(..), DistVector(..),
         vincentyDistance, vincentyFormulae, directDistance, trackLength) where
 
 import Data.Time (UTCTime)
@@ -11,13 +10,13 @@ data Position = Position Double Double  -- Lat Long
     deriving (Show, Eq)
 data TrackPoint = TrackPoint { tpTime :: UTCTime, tpPos :: Position, tpAlt :: Double }
     deriving (Show, Eq)
-data PointShift = PointShift { psDistance :: Double, psAzimuth :: Double }
+data DistVector = DistVector { dvDistance :: Double, dvAzimuth :: Double }
     deriving (Show)
 
-vincentyFormulae :: Position -> Position -> PointShift
+vincentyFormulae :: Position -> Position -> DistVector
 vincentyFormulae (Position lat1 long1) (Position lat2 long2) 
-    | lat1 == lat2 && long1 == long2    = PointShift 0 0 
-    | otherwise                         = PointShift (round2mm (b * al * (fin_sig - dsig))) azm
+    | lat1 == lat2 && long1 == long2    = DistVector 0 0 
+    | otherwise                         = DistVector {dvDistance = round2mm (b * al * (fin_sig - dsig)), dvAzimuth = azm}
     where
     a = 6378137.0       -- length of major axis of the ellipsoid (radius at equator)
     f = 1/298.257223563 -- flattening of the ellipsoid
@@ -52,7 +51,7 @@ vincentyFormulae (Position lat1 long1) (Position lat2 long2)
         cl = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
 
 vincentyDistance :: Position -> Position -> Double
-vincentyDistance pos1 pos2 = psDistance (vincentyFormulae pos1 pos2)
+vincentyDistance pos1 pos2 = dvDistance (vincentyFormulae pos1 pos2)
 
 directDistance :: TrackPoint -> TrackPoint -> Double
 directDistance (TrackPoint _ pos1 alt1) (TrackPoint _ pos2 alt2) = round2mm $ sqrt (altdist ^ p2 + landdist ^ p2)

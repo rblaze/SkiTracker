@@ -23,7 +23,7 @@ makeTrackInfo track = zipWith mkinfo track (tail track)
     mkinfo (TrackPoint time1 pos1 alt1) (TrackPoint time2 pos2 alt2)
         = SegmentInfo time1 Idle pos1 pos2 alt1 azimuth hdist vdiff totaldist timediff speed
         where
-        PointShift hdist azimuth = vincentyFormulae pos1 pos2
+        DistVector hdist azimuth = vincentyFormulae pos1 pos2
         vdiff = alt2 - alt1
         totaldist = sqrt (hdist ^ (2 :: Int) + vdiff ^ (2 :: Int))
         timediff = timeDelta time2 time1
@@ -56,7 +56,7 @@ isGoodLift track
     speedStdDev = stddev $ fmap (\x -> avgspeed - siSpeed x) track
     speedmatch = (speedStdDev / avgspeed) < 0.3
 
-    avgazm = psAzimuth $ vincentyFormulae (siStart $ Q.head track) (siEnd $ Q.last track)
+    avgazm = dvAzimuth $ vincentyFormulae (siStart $ Q.head track) (siEnd $ Q.last track)
     azmdev = stddev $ fmap (azmdiff avgazm . siAzimuth) track
     dirmatch = azmdev < 0.14
     
