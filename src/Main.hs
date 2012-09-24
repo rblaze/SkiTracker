@@ -4,7 +4,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.List (groupBy)
 import Data.Function (on)
 import System.Environment
-import Text.Blaze.Renderer.Pretty
+import Text.Blaze.Html.Renderer.Pretty
 import Text.Printf
 
 import AppServer

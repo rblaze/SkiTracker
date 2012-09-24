@@ -16,11 +16,12 @@ executable ski-tracker
                    mtl,
                    happstack-lite,
                    blaze-html,
+                   blaze-markup,
                    text,
                    transformers,
                    cryptohash,
                    directory
-  ghc-options:     -Wall
+  ghc-options:     -Wall -rtsopts -O2
 
 test-suite TestMain
   type:            exitcode-stdio-1.0

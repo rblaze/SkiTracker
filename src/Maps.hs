@@ -8,7 +8,7 @@ import Data.Time.Format(formatTime)
 import System.Locale (defaultTimeLocale)
 import Text.Printf
 
-import Text.Blaze.Html5 ((!))
+import Text.Blaze ((!))
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
@@ -19,7 +19,7 @@ import Util
 getMapScript :: [[SegmentInfo]] -> H.Html
 getMapScript paths = do
         H.script ! A.type_ "text/javascript" ! A.src "http://maps.googleapis.com/maps/api/js?key=AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM&sensor=false" $ ""
-        H.script ! A.type_ "text/javascript" $ H.preEscapedString mapscript  
+        H.script ! A.type_ "text/javascript" $ H.preEscapedToMarkup mapscript  
     where
     mapscript = header ++ path ++ "}"
     path = snd $ flip execState (0, "") $
