@@ -1,11 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module AppServer(appServerMain) where
+module Main where
 
 import Control.Monad (join)
 import Control.Monad.IO.Class (liftIO)
-import Data.Function (on)
-import Data.List (groupBy)
 import Data.String (fromString)
 import Happstack.Lite
 import System.Directory
@@ -18,14 +16,15 @@ import qualified Data.ByteString as BS
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
-import Maps
-import Markup
+import HtmlMap
+import PaintSki
 import Parse
+import SegmentedTrack
 
 import Debug.Trace
 
-appServerMain :: IO ()
-appServerMain = serve Nothing myApp
+main :: IO ()
+main = serve Nothing myApp
 
 myApp :: ServerPart Response
 myApp = msum [
@@ -49,10 +48,9 @@ makeMap :: BS.ByteString -> H.Html
 makeMap xml = html
     where
     gpstrack = parseTrack xml
-    track = makeTrackInfo gpstrack
-    marked = markLifts track
-    parts = groupBy ((==) `on` siType) marked
-    html = getMapPage parts
+    track = makeSegmentedTrack gpstrack
+    runs = paintSkiTrack track
+    html = makeMapPage runs
 
 createTrackId :: BS.ByteString -> String
 createTrackId track = parseTrack track `seq` concatMap (printf "%02x") (BS.unpack (MD5.hash track))

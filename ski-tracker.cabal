@@ -4,7 +4,8 @@ cabal-version:  >= 1.2
 build-type:     Simple
 
 executable ski-tracker
-  hs-source-dirs:  src
+  hs-source-dirs:  appserver,
+                   src
   main-is:         Main.hs
   build-depends:   
                    base >= 4,
@@ -21,6 +22,22 @@ executable ski-tracker
                    transformers,
                    cryptohash,
                    directory
+  ghc-options:     -Wall -rtsopts -O2
+
+executable trackutil
+  hs-source-dirs:  
+                   trackutil,
+                   src
+  main-is:         Main.hs
+  build-depends:   
+                   base >= 4,
+                   blaze-html,
+                   blaze-markup,
+                   bytestring,
+                   converge,
+                   old-locale,
+                   time,
+                   xml
   ghc-options:     -Wall -rtsopts -O2
 
 test-suite TestMain

@@ -7,6 +7,7 @@ import System.Locale (defaultTimeLocale)
 import Text.XML.Light
 
 import Track
+import Geo(Position(..))
 
 parseTcxPoint :: Element -> Maybe TrackPoint
 parseTcxPoint x = liftM3 TrackPoint time pos alt
