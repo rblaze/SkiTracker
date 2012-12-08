@@ -35,13 +35,54 @@ printSegment name track = "    var " ++ name ++ " = [\n        "
         ++ printPosition (tsEndPos $ last track) ++ "\n"
         ++ "     ];\n"
 
+setMarker :: String -> Position -> Int -> String -> String
+setMarker iconfile pos uniq message = "    var " ++ posname ++ " = "
+        ++ printPosition pos ++ ";\n\
+\    var " ++ markname ++ " = new google.maps.Marker({\n\
+\        position: " ++ posname ++ ",\n\
+\        map: map,\n\
+\        icon: '" ++ iconfile ++ "'\n\
+\     });\n"
+        ++ addClickListener markname message
+    where
+    posname = printf "markerPos%d" uniq
+    markname = printf "marker%d" uniq
+
+makeRunMessage :: SkiRun -> String
+makeRunMessage track = show (runType track) ++ " " ++ show (runStartTime track) 
+    ++ "<br>Duration: " ++ printf "%dm %ds" mins secs
+    ++ "<br>Avg Speed: " ++ printf "%.1f" (runAvgSpeed track)
+    where
+    (mins, secs) = quotRem (round $ runDuration track :: Int) 60
+
+setStartMarker :: Int -> SkiRun -> String
+setStartMarker uniq track = setMarker iconfile startpos uniq message
+    where
+    startpos = tsStartPos $ head $ runPoints track
+    message = makeRunMessage track
+    iconfile = "static/" ++ iconname
+    iconname = case runType track of
+                Track   -> "snowboarding.png"
+                Lift    -> "skilift.png"
+                Idle    -> "rest.png"
+
+addClickListener :: String -> String -> String
+addClickListener object message =
+        "    google.maps.event.addListener(" ++ object
+        ++ ", 'click', function(event) "
+        ++ "{ onPathClick(event, \"" ++ message ++  "\");});\n"
+
 addSegmentToMap :: Int -> SkiRun -> String
 addSegmentToMap uniq track = printSegment pathname (runPoints track)
         ++ polyline linename pathname
         ++ "    " ++ linename ++ ".setMap(map);\n"
-        ++ "    google.maps.event.addListener(" ++ linename ++ ", 'click', function(event) { onPathClick(event, \"" ++ message ++  "\");});\n"
+        ++ addClickListener linename message
+        ++ (case runType track of
+                Idle -> setStartMarker uniq track
+                _ -> ""
+            )
     where
-    message = show (runType track) ++ " " ++ show (runStartTime track) ++ "<br>Duration: " ++ show (runDuration track)
+    message = makeRunMessage track
     color = case runType track of
         Idle -> "#00FF00"
         Track -> "#FF0000"

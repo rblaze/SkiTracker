@@ -23,6 +23,9 @@ type LookAhead = Q.Queue TrackSegment
 minLiftDuration :: Num a => a
 minLiftDuration = 60
 
+minSegmentTime :: Num a => a
+minSegmentTime = 30
+
 minLiftDistance :: Num a => a
 minLiftDistance = 50
 
@@ -92,16 +95,32 @@ tryExpandLift liftq s ss
     nextq = Q.push liftq s
     repainted = Q.toList $ setType Lift liftq
 
-filterShortSegments :: [[TrackSegment]] ->  [[TrackSegment]]
-filterShortSegments (xp:x:xn:xs)
-    | segDuration x > 30 = xp : filterShortSegments (x:xn:xs)
--- check times below
---    | tsType (head xp) == tsType (head xn) && segDuration xp > 30 = filterShortSegments (longseg : xs)
-    | tsType (head xp) == Track && tsType (head x) == Idle && tsType (head xn) == Track = filterShortSegments (longseg : xs)
-    | otherwise = xp : filterShortSegments (x:xn:xs)
+mergeHead :: [[TrackSegment]] ->  [[TrackSegment]]
+mergeHead track = if null rest then track else (mhead ++ r):rs
     where
-    longseg = xp ++ setType (tsType $ head xp) x ++ xn
-filterShortSegments xs = xs
+    (small, rest@(r:rs)) = break (\s -> segDuration s > minSegmentTime) track
+    mhead = setType (tsType $ head r) $ concat small
+
+mergeMiddle :: [[TrackSegment]] -> [[TrackSegment]]
+mergeMiddle [] = []
+mergeMiddle track@(x1:_) = func (tsType $ head x1) [] track
+    where
+    func :: SegmentType -> [[TrackSegment]] -> [[TrackSegment]] -> [[TrackSegment]]
+    -- common case, nothing to do, just go further
+    func _ [] (x:xs)
+        | segDuration x > minSegmentTime    = x : func (tsType $ head x) [] xs
+    -- end with long segment
+    func _ [] [] = []
+    -- end with short segment
+    func ptype hold [] = map (setType ptype) $ reverse hold
+    -- inside short run, end or continue
+    func ptype hold (x:xs)
+        | segDuration x > minSegmentTime
+                    = (map (setType htype) $ reverse hold) ++ x : func xtype [] xs
+        | otherwise = func ptype (x:hold) xs
+        where
+        xtype = tsType $ head x
+        htype = if ptype == xtype then ptype else Idle
 
 annotate :: [TrackSegment] -> SkiRun
 annotate s = SkiRun (tsType $ head s) avg duration (tsStartTime $ head s) s
@@ -114,4 +133,5 @@ paintSkiTrack :: [TrackSegment] -> [SkiRun]
 paintSkiTrack track = filtered
     where
     painted = paintLifts Q.empty $ paintLowSpeed track
-    filtered = map annotate $ filterShortSegments $ groupBy ((==) `on` tsType) painted
+    filtered = map annotate $ regroup $ mergeMiddle $ mergeHead $ regroup [painted]
+    regroup = groupBy ((==) `on` tsType) . concat
