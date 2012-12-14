@@ -1,5 +1,5 @@
 module SegmentedTrack(SegmentType(..), TrackSegment(..),
-        makeSegmentedTrack, ts3Dspeed, tsSpeed, tsAltDiff) where
+        makeSegmentedTrack, ts3Ddistance, ts3Dspeed, tsSpeed, tsAltDiff) where
 
 import Data.Time (UTCTime)
 
@@ -19,7 +19,7 @@ data TrackSegment = TrackSegment {
         tsEndPos :: Position,
         tsEndAlt :: Double,
         tsVector :: DistVector
-    }
+    } deriving (Show)
 
 tsAltDiff :: TrackSegment -> Double
 tsAltDiff ts = tsEndAlt ts - tsStartAlt ts
@@ -27,8 +27,11 @@ tsAltDiff ts = tsEndAlt ts - tsStartAlt ts
 tsSpeed :: TrackSegment -> Double
 tsSpeed ts = dvDistance (tsVector ts) / tsDuration ts
 
+ts3Ddistance :: TrackSegment -> Double
+ts3Ddistance ts = sqrt $ sq (dvDistance (tsVector ts)) + sq (tsAltDiff ts)
+
 ts3Dspeed :: TrackSegment -> Double
-ts3Dspeed ts = sqrt (sq (dvDistance (tsVector ts)) + sq (tsAltDiff ts)) / tsDuration ts
+ts3Dspeed ts = ts3Ddistance ts / tsDuration ts
 
 mkSegment :: TrackPoint -> TrackPoint -> TrackSegment
 mkSegment pt1 pt2 = TrackSegment { tsType = undefined,

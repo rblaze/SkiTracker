@@ -60,7 +60,7 @@ setStartMarker uniq track = setMarker iconfile startpos uniq message
     where
     startpos = tsStartPos $ head $ runPoints track
     message = makeRunMessage track
-    iconfile = "/static/" ++ iconname
+    iconfile = "static/" ++ iconname
     iconname = case runType track of
                 Track   -> "snowboarding.png"
                 Lift    -> "skilift.png"
@@ -79,6 +79,7 @@ addSegmentToMap uniq track = printSegment pathname (runPoints track)
         ++ addClickListener linename message
         ++ (case runType track of
                 Idle -> setStartMarker uniq track
+                Lift -> setStartMarker uniq track
                 _ -> ""
             )
     where

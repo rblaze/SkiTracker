@@ -116,7 +116,7 @@ mergeMiddle track@(x1:_) = func (tsType $ head x1) [] track
     -- inside short run, end or continue
     func ptype hold (x:xs)
         | segDuration x > minSegmentTime
-                    = (map (setType htype) $ reverse hold) ++ x : func xtype [] xs
+                    = map (setType htype) (reverse hold) ++ x : func xtype [] xs
         | otherwise = func ptype (x:hold) xs
         where
         xtype = tsType $ head x
