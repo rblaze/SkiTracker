@@ -49,27 +49,27 @@ vincentyFormulae' (Position lat long) (DistVector dist azimuth)
     tanU1 = (1 - f) * tan lat
     sinU1 = tanU1 / sqrt (1 + sq tanU1)
     cosU1 = 1 / sqrt (1 + sq tanU1)
-    sig1 = atan2 tanU1 (cos azimuth)
-    sina = cosU1 * sin azimuth
-    cos2a = (1 - sina) * (1 + sina)
-    u2 = calcU2 cos2a
+    σ1 = atan2 tanU1 (cos azimuth)
+    sinα = cosU1 * sin azimuth
+    cos_sqα = (1 - sinα) * (1 + sinα)
+    u2 = calcU2 cos_sqα
     _A = calcA u2
     _B = calcB u2
     initsigma = dist / (b * _A)
-    directStep s = let sigm2 = 2 * sig1 + s
-                       dsig = calcDSig _B (sin s) (cos s) (cos sigm2)
-                    in dist / (b * _A) + dsig
-    sig = convergeTo 0 1e-12 (iterate directStep initsigma)
-    l2h = sinU1 * cos sig + cosU1 * sin sig * cos azimuth
-    l2l = (1 - f) * sqrt (sq sina + sq (sinU1 * sin sig - cosU1 * cos sig * cos azimuth))
+    directStep σ' = let σm2 = 2 * σ1 + σ'
+                        _Δσ = calcDSig _B (sin σ') (cos σ') (cos σm2)
+                     in dist / (b * _A) + _Δσ
+    σ = convergeTo 0 1e-12 (iterate directStep initsigma)
+    l2h = sinU1 * cos σ + cosU1 * sin σ * cos azimuth
+    l2l = (1 - f) * sqrt (sq sinα + sq (sinU1 * sin σ - cosU1 * cos σ * cos azimuth))
     lat2 = atan2 l2h l2l
 
-    lambda = atan2 (sin sig * sin azimuth) (cosU1 * cos sig - sinU1 * sin sig * cos azimuth)
-    _C = f / 16 * cos2a * (4 + f * (4 - 3 * cos2a))
-    _L = let sigm2 = 2 * sig1 + sig
-             in lambda - (1 - _C) * f * sina * (
-                    sig + _C * sin sig * (
-                        cos sigm2 + _C * cos sig * ((-1) + 2 * sq (cos sigm2))
+    λ = atan2 (sin σ * sin azimuth) (cosU1 * cos σ - sinU1 * sin σ * cos azimuth)
+    _C = f / 16 * cos_sqα * (4 + f * (4 - 3 * cos_sqα))
+    _L = let σm2 = 2 * σ1 + σ
+             in λ - (1 - _C) * f * sinα * (
+                    σ + _C * sin σ * (
+                        cos σm2 + _C * cos σ * ((-1) + 2 * sq (cos σm2))
                       )
                   )
 
@@ -80,44 +80,46 @@ vincentyFormulae' (Position lat long) (DistVector dist azimuth)
         | otherwise     = suma
         where suma = a1 + a2
 
+inverseCalc :: Double -> Double -> Double -> (Double, Double, Double, Double, Double, Double)
+inverseCalc λ _U1 _U2 = (cos_sqα, sinσ, cosσ, cosσm2, sinα, σ)
+    where
+    sinσ = sqrt (sq (cos _U2 * sin λ) + sq (cos _U1 * sin _U2 - sin _U1 * cos _U2 * cos λ))
+    cosσ = sin _U1 * sin _U2 + cos _U1 * cos _U2 * cos λ
+    σ = atan2 sinσ cosσ
+    sinα = cos _U1 * cos _U2 * sin λ / sinσ
+    cos_sqα = 1 - sq sinα
+    cosσm2 
+        | cos_sqα == 0  = 0
+        | otherwise     = cosσ - 2 * sin _U1 * sin _U2 / cos_sqα
+
+inverseStep :: Double -> Double -> Double -> Double -> Double
+inverseStep _U1 _U2 _L λ = _L + (1 - _C) * f * sinα * (
+                                sig + _C * sinσ * (
+                                    cosσm2 + _C * cosσ * (-1 + 2 * sq cosσm2)
+                                  )
+                              )
+    where
+    (cos2α, sinσ, cosσ, cosσm2, sinα, sig) = inverseCalc λ _U1 _U2
+    _C = f / 16 * cos2α * (4 + f * (4 - 3 * cos2α))
+
 -- | 'vincentyFormulae' @start end@ calculates distance and azimuth
 -- from @start@ to @end@ on Earth's surface.
 vincentyFormulae :: Position -> Position -> DistVector
 vincentyFormulae (Position lat1 long1) (Position lat2 long2) 
     | lat1 == lat2 && long1 == long2    = DistVector 0 0 
-    | otherwise                         = DistVector {dvDistance = round2mm (b * _A * (fin_sig - dsig)), dvAzimuth = azm}
+    | otherwise                         = DistVector {dvDistance = round2mm (b * _A * (σ - dsig)), dvAzimuth = azm}
     where
     _U1 = atan ((1 - f) * tan lat1)
     _U2 = atan ((1 - f) * tan lat2)
     _L = long2 - long1
-    lambda = convergeTo 0 1e-12 (iterate inverseStep _L)
-    (fin_cos2al, fin_sinsig, fin_cossig, fin_cossigm2, _, fin_sig) = precalc lambda 
-    up2 = calcU2 fin_cos2al
+    λ = convergeTo 0 1e-12 $ iterate (inverseStep _U1 _U2 _L) _L
+    (cos_sqα, sinσ, cosσ, cosσm2, _, σ) = inverseCalc λ _U1 _U2
+    up2 = calcU2 cos_sqα
     _A = calcA up2
     _B = calcB up2
-    dsig = calcDSig _B fin_sinsig fin_cossig fin_cossigm2
-    azm = atan2 (cos _U2 * sin lambda) (cos _U1 * sin _U2 - sin _U1 * cos _U2 * cos lambda)
+    dsig = calcDSig _B sinσ cosσ cosσm2
+    azm = atan2 (cos _U2 * sin λ) (cos _U1 * sin _U2 - sin _U1 * cos _U2 * cos λ)
 
-    precalc :: Double -> (Double, Double, Double, Double, Double, Double)
-    precalc la = (cos2al, sinsig, cossig, cossigm2, sinal, sig)
-        where
-        sinsig = sqrt (sq (cos _U2 * sin la) + sq (cos _U1 * sin _U2 - sin _U1 * cos _U2 * cos la))
-        cossig = sin _U1 * sin _U2 + cos _U1 * cos _U2 * cos la
-        sig = atan2 sinsig cossig
-        sinal = cos _U1 * cos _U2 * sin la / sinsig
-        cos2al = 1 - sq sinal
-        cossigm2 
-            | cos2al == 0   = 0
-            | otherwise     = cossig - 2 * sin _U1 * sin _U2 / cos2al
-
-    inverseStep :: Double -> Double
-    inverseStep la = let (cos2al, sinsig, cossig, cossigm2, sinal, sig) = precalc la
-                         _C = f / 16 * cos2al * (4 + f * (4 - 3 * cos2al))
-                      in _L + (1 - _C) * f * sinal * (
-                            sig + _C * sinsig * (
-                                cossigm2 + _C * cossig * (-1 + 2 * sq cossigm2)
-                              )
-                          )
 
 -- | 'azimuthDiff' @first second@ calculates smallest angle between two azimuths.
 azimuthDiff :: Double -> Double -> Double
