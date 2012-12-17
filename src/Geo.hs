@@ -31,11 +31,11 @@ calcB x = x / 1024 * (256 + x * (-128 + x * (74 - 47 * x)))
 calcU2 :: Double -> Double
 calcU2 x = x * (sq a - sq b) / sq b
 
-calcDSig :: Double -> Double -> Double -> Double -> Double
-calcDSig _B sinsig cossig cos2sigm = _B * sinsig * (
-        cos2sigm + _B / 4 * (
-            cossig * (-1 + 2 * sq cos2sigm)
-            - _B / 6 * cos2sigm * (-3 + 4 * sq sinsig * (-3 + 4 * sq cos2sigm))
+calcΔσ :: Double -> Double -> Double -> Double -> Double
+calcΔσ _B sinσ cosσ cos_σm2 = _B * sinσ * (
+        cos_σm2 + _B / 4 * (
+            cosσ * (-1 + 2 * sq cos_σm2)
+            - _B / 6 * cos_σm2 * (-3 + 4 * sq sinσ * (-3 + 4 * sq cos_σm2))
           )
       )
 
@@ -57,7 +57,7 @@ vincentyFormulae' (Position lat long) (DistVector dist azimuth)
     _B = calcB u2
     initsigma = dist / (b * _A)
     directStep σ' = let σm2 = 2 * σ1 + σ'
-                        _Δσ = calcDSig _B (sin σ') (cos σ') (cos σm2)
+                        _Δσ = calcΔσ _B (sin σ') (cos σ') (cos σm2)
                      in dist / (b * _A) + _Δσ
     σ = convergeTo 0 1e-12 (iterate directStep initsigma)
     l2h = sinU1 * cos σ + cosU1 * sin σ * cos azimuth
@@ -107,7 +107,7 @@ inverseStep _U1 _U2 _L λ = _L + (1 - _C) * f * sinα * (
 vincentyFormulae :: Position -> Position -> DistVector
 vincentyFormulae (Position lat1 long1) (Position lat2 long2) 
     | lat1 == lat2 && long1 == long2    = DistVector 0 0 
-    | otherwise                         = DistVector {dvDistance = round2mm (b * _A * (σ - dsig)), dvAzimuth = azm}
+    | otherwise                         = DistVector {dvDistance = round2mm (b * _A * (σ - _Δσ)), dvAzimuth = azm}
     where
     _U1 = atan ((1 - f) * tan lat1)
     _U2 = atan ((1 - f) * tan lat2)
@@ -117,7 +117,7 @@ vincentyFormulae (Position lat1 long1) (Position lat2 long2)
     up2 = calcU2 cos_sqα
     _A = calcA up2
     _B = calcB up2
-    dsig = calcDSig _B sinσ cosσ cosσm2
+    _Δσ = calcΔσ _B sinσ cosσ cosσm2
     azm = atan2 (cos _U2 * sin λ) (cos _U1 * sin _U2 - sin _U1 * cos _U2 * cos λ)
 
 
