@@ -74,7 +74,7 @@ main = do
             let segments = makeSegmentedTrack gpstrack
             let colored = paintSkiTrack segments
 
-            printf "%s" (renderHtml $ makeMapPage colored)
+            printf "%s" (renderHtml $ makeMapPage "http://skitracker.ruddy.ru" colored)
 {--
         "drawmarked" -> do
             filedata <- readFile filename

@@ -14,6 +14,7 @@ data SkiRun = SkiRun {
     runType      :: SegmentType,
     runAvgSpeed  :: Double,
     runDuration  :: Double,
+    runDistance  :: Double,
     runStartTime :: UTCTime,
     runPoints    :: [TrackSegment]
   }
@@ -123,7 +124,7 @@ mergeMiddle track@(x1:_) = func (tsType $ head x1) [] track
         htype = if ptype == xtype then ptype else Idle
 
 annotate :: [TrackSegment] -> SkiRun
-annotate s = SkiRun (tsType $ head s) avg duration (tsStartTime $ head s) s
+annotate s = SkiRun (tsType $ head s) avg duration distance (tsStartTime $ head s) s
     where
     duration = segDuration s
     distance = segDistance s

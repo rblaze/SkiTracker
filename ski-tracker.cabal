@@ -9,19 +9,20 @@ executable skiserver
   main-is:         Main.hs
   build-depends:   
                    base >= 4,
-                   xml,
-                   bytestring,
-                   time,
-                   old-locale,
-                   converge,
-                   mtl,
-                   happstack-lite,
                    blaze-html,
                    blaze-markup,
-                   text,
-                   transformers,
+                   bytestring,
+                   converge,
                    cryptohash,
-                   directory
+                   directory,
+                   happstack-server,
+                   mtl,
+                   old-locale,
+                   text,
+                   time,
+                   transformers,
+                   unix,
+                   xml
   ghc-options:     -Wall -rtsopts -O2
 
 executable trackutil

@@ -2,11 +2,13 @@
 
 module Main where
 
-import Control.Monad (join)
+import Control.Monad (join, msum, mzero)
 import Control.Monad.IO.Class (liftIO)
 import Data.String (fromString)
-import Happstack.Lite
+import Data.Functor
+import Happstack.Server
 import System.Directory
+import System.Posix.User (setUserID, UserEntry(..), getUserEntryForName)
 import Text.Blaze.Html5 (Html, (!), form, input, toHtml)
 import Text.Blaze.Html5.Attributes (action, enctype, name, type_, value)
 import Text.Printf
@@ -23,8 +25,18 @@ import SegmentedTrack
 
 import Debug.Trace
 
+server :: String
+server = "http://skitracker.ruddy.ru"
+
+uploadPolicy :: BodyPolicy
+uploadPolicy = defaultBodyPolicy "/tmp" (10*1024*1024) 1024 1024
+
 main :: IO ()
-main = serve Nothing myApp
+main = do
+    let conf = nullConf {port = 80}
+    socket <- bindPort conf
+    getUserEntryForName "ec2-user" >>= setUserID . userID
+    simpleHTTPWithSocket socket conf myApp
 
 myApp :: ServerPart Response
 myApp = msum [
@@ -37,20 +49,20 @@ serveStatic :: ServerPart Response
 serveStatic = serveDirectory DisableBrowsing [] "static"
 
 template :: String -> Html -> Response
-template title body = toResponse $
+template htitle hbody = toResponse $
     H.html $ do
         H.head $
-            H.title (toHtml title)
+            H.title (toHtml htitle)
         H.body 
-            body
+            hbody
 
-makeMap :: BS.ByteString -> H.Html
-makeMap xml = html
+makeMap :: String -> BS.ByteString -> H.Html
+makeMap uri xml = html
     where
     gpstrack = parseTrack xml
     track = makeSegmentedTrack gpstrack
     runs = paintSkiTrack track
-    html = makeMapPage runs
+    html = makeMapPage uri runs
 
 createTrackId :: BS.ByteString -> String
 createTrackId track = parseTrack track `seq` concatMap (printf "%02x") (BS.unpack (MD5.hash track))
@@ -73,6 +85,7 @@ trackPage = msum [ uploadForm, saveTrack, showTrack ]
         method POST
         nullDir
 
+        decodeBody uploadPolicy
         (tmpFile, _, _) <- lookFile "track"
         xml <- liftIO $ BS.readFile tmpFile
 
@@ -98,6 +111,7 @@ trackPage = msum [ uploadForm, saveTrack, showTrack ]
     showTrack :: ServerPart Response
     showTrack = do
         method GET
+        uri <- rqUri <$> askRq
         path $ \trackid -> do
             xml <- liftIO $ BS.readFile ("data/" ++ trackid)
-            trace "Processing track" $ ok $ toResponse $ makeMap xml
+            trace "Processing track " $ ok $ toResponse $ makeMap (server ++ uri) xml
