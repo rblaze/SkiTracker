@@ -42,7 +42,8 @@ myApp :: ServerPart Response
 myApp = msum [
     dir "data" mzero,
     dir "static" serveStatic,
-    dir "track" trackPage
+    dir "track" trackPage,
+    nullDir >> rootPage
     ]
 
 serveStatic :: ServerPart Response
@@ -55,6 +56,11 @@ template htitle hbody = toResponse $
             H.title (toHtml htitle)
         H.body 
             hbody
+
+rootPage :: ServerPart Response
+rootPage = trace "Showing root" $ ok $ template "SkiTracker" $ do
+                H.p $ H.a ! A.href "/track" $ "Upload track"
+                H.p $ H.a ! A.href "https://github.com/rblaze/SkiTracker" $ "Source code"
 
 makeMap :: String -> BS.ByteString -> H.Html
 makeMap uri xml = html
