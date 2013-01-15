@@ -4,8 +4,10 @@ module HtmlMap(makeMapPage) where
 
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
+import qualified Text.Blaze.Html.Renderer.String as R
 import Data.List
 import Data.Time.Format
+import Data.Time.Clock (UTCTime)
 import System.Locale (defaultTimeLocale)
 import Text.Blaze ((!))
 import Text.Printf
@@ -178,26 +180,44 @@ styleSheet = "\
 \        }"
 
 printDuration :: Double -> String
-printDuration d = if hours > 0 then if mins /= 0 then printf "%dh %dm" hours mins else printf "%dh" hours
-                               else if secs /= 0 then printf "%dm %ds" mins secs else printf "%dm" mins
+printDuration d
+    | hours > 0 = if mins /= 0 then printf "%dh %dm" hours mins else printf "%dh" hours
+    | secs /= 0 = printf "%dm %ds" mins secs
+    | otherwise = printf "%dm" mins
     where
     (ms, secs) = quotRem (round d :: Int) 60
     (hours, mins) = quotRem ms 60
 
 printDistance :: Double -> String
-printDistance d = let (km, m) = quotRem (round d :: Int) 1000
-                   in if km > 0 then if m /= 0 then printf "%dkm %dm" km m else printf "%dkm" km
-                                else printf "%dm" m
+printDistance d
+    | km > 0    = if m /= 0 then printf "%dkm %dm" km m else printf "%dkm" km
+    | otherwise = printf "%dm" m
+    where (km, m) = quotRem (round d :: Int) 1000
 
 printSpeed :: Double -> String
 printSpeed s = printf "%0.1f km/h" (s * 3.6)
 
+printTime :: String -> UTCTime -> String
+printTime = formatTime defaultTimeLocale
+
 makeRunSummary :: SkiRun -> String
-makeRunSummary track = show (runType track) ++ " " ++ show (runStartTime track) 
-    ++ "<br>Duration: " ++ printf "%dm %ds" mins secs
-    ++ "<br>Avg Speed: " ++ printf "%.1f" (runAvgSpeed track)
-    where
-    (mins, secs) = quotRem (round $ runDuration track :: Int) 60
+makeRunSummary track = R.renderHtml $ sequence_ $ intersperse H.br $ map H.toHtml $
+        case runType track of
+            Idle -> [ "Idle " ++ printTime "%X" (runStartTime track),
+                      "Duration: " ++ printDuration (runDuration track),
+                      "Avg Speed: " ++ printSpeed (runAvgSpeed track)
+                    ]
+            Lift -> [ "Lift " ++ printTime "%X" (runStartTime track),
+                      "Duration: " ++ printDuration (runDuration track),
+                      "Avg Speed: " ++ printSpeed (runAvgSpeed track)
+                    ]
+            Track -> [ "Run " ++ printTime "%X" (runStartTime track),
+                       "Duration: " ++ printDuration (runDuration track),
+                       "Length: " ++ printDistance (runDistance track),
+                       "Avg speed: " ++ printSpeed (runAvgSpeed track),
+                       "Max speed: " ++ printSpeed (maximum $ map tsSpeed $ runPoints track),
+                       "Max sustained speed: " ++ printSpeed (sustainedSpeed $ runPoints track)
+                    ]
 
 makeTrackSummary :: [SkiRun] -> TrackStats
 makeTrackSummary track = TrackStats {
@@ -215,7 +235,6 @@ makeTrackSummary track = TrackStats {
     }
     where
     rundist = sum $ map runDistance runs
-    printTime = formatTime defaultTimeLocale
     firstSegment = head track
     runs = filter (\s -> runType s == Track) track
 
@@ -274,6 +293,7 @@ makeMapPage uri track = do
                         printTrackSummary stats
                         H.br
                         H.a ! A.onclick "postToFeed(); return false;" $ H.img ! A.src "/static/post-button.png"
+                        H.p "Click on track to see segment details"
                     H.div ! A.id "segdata" $ ""
                 H.div ! A.id "content" $ H.div ! A.class_ "paddedContent" $
                     H.div ! A.id "map_canvas" ! A.style "width: 100%; height: 100%" $ ""
