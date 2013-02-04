@@ -45,7 +45,7 @@ centerPoint track = Position (avg maxx minx) (avg maxy miny)
     (minx, miny, maxx, maxy) = foldr1 minMax $ map segmentLimits $ concatMap runPoints track
 
 printPosition :: Position -> String
-printPosition (Position x y) = printf "new google.maps.LatLng(%f, %f)" (x / pi * 180) (y / pi * 180)
+printPosition (Position x y) = printf "new google.maps.LatLng(%0.6f, %0.6f)" (x / pi * 180) (y / pi * 180)
 
 printSegment :: String -> [TrackSegment] -> String
 printSegment name track = "    var " ++ name ++ " = [\n        "
