@@ -31,7 +31,7 @@ minLiftDistance :: Num a => a
 minLiftDistance = 50
 
 liftSpeedVariance :: Fractional a => a
-liftSpeedVariance = 0.3
+liftSpeedVariance = 0.23
 
 liftAzimuthDev :: Fractional a => a
 liftAzimuthDev = 0.14
