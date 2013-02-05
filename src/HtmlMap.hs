@@ -13,7 +13,7 @@ import Text.Blaze ((!))
 import Text.Printf
 
 import Geo
-import GoogleStaticMap
+--import GoogleStaticMap
 import PaintSki
 import SegmentedTrack
 import SegmentStats
@@ -55,13 +55,13 @@ printSegment name track = "    var " ++ name ++ " = [\n        "
         ++ printPosition (tsEndPos $ last track) ++ "\n"
         ++ "     ];\n"
 
+{--
 printPolyLine :: String -> [Position] -> String
 printPolyLine name line = "    var " ++ name
         ++ " = google.maps.geometry.encoding.encodePath([\n        "
         ++ intercalate ",\n        " (map printPosition line)
         ++ "\n     ]);\n"
 
-{--
 setMarker :: String -> Position -> Int -> String -> String
 setMarker iconfile pos uniq message = "    var " ++ posname ++ " = "
         ++ printPosition pos ++ ";\n\
@@ -125,7 +125,7 @@ generateScript :: [SkiRun] -> H.Html
 generateScript track = do
     H.script ! A.type_ "text/javascript" ! A.src (H.toValue $ "http://maps.googleapis.com/maps/api/js?key=" ++ googleApiKey ++ "&libraries=geometry&sensor=false") $ ""
     H.script ! A.type_ "text/javascript" $ H.toHtml script
-    H.script ! A.type_ "text/javascript" $ H.toHtml staticscript
+--    H.script ! A.type_ "text/javascript" $ H.toHtml staticscript
     where
     script :: String
     script = header ++ path ++ footer
@@ -147,12 +147,14 @@ generateScript track = do
     footer = "}"
     path = concat $ zipWith addSegmentToMap [0..] track
 
+{--
     staticmap = stripMap track
     staticpath = printPolyLine "staticline" $ concatMap plPoints staticmap
     staticurl = "        var mapurl = 'http://maps.googleapis.com/maps/api/staticmap?path=enc:' + staticline + '&sensor=false&size=400x400';"
 
     staticscript :: String
     staticscript = staticpath ++ staticurl
+--}
 
 styleSheet :: H.Html
 styleSheet = "\
@@ -275,7 +277,7 @@ initFacebook uri stats = do
 \                method: 'feed',    \n\
 \                display: 'popup',    \n\
 \                link: '" ++ uri ++ "',    \n\
-\                picture: mapurl,    \n\
+\                picture: 'http://skitracker.ruddy.ru/static/snowboarding.png', \n\
 \                name: '" ++ aproxDistance stats ++ " down slope!',    \n\
 \                description: 'Total time " ++ duration stats ++ ", slope time " ++ slopeTime stats
                         ++ ", max speed " ++ maxSpeed stats ++ ", sustained speed " ++ maxSustainedSpeed stats ++ "'    \n\
