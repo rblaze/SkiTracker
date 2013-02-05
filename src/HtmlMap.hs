@@ -150,7 +150,7 @@ generateScript track = do
     staticmap = stripMap track
     staticpath = zipWith printPolyLine ["static" ++ show (i::Int) | i <- [0..]] staticmap
     staticurl =  "var mapurl = 'http://maps.googleapis.com/maps/api/staticmap?"
-                ++ concat (zipWith printUrlSeg [0..] staticmap)
+                ++ concat (zipWith printUrlSeg [0 :: Int ..] staticmap)
                 ++ "&sensor=false&size=400x400';\n"
 
     printUrlSeg n s = "&path=color:"
