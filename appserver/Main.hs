@@ -39,12 +39,15 @@ main = do
     simpleHTTPWithSocket socket conf myApp
 
 myApp :: ServerPart Response
-myApp = msum [
-    dir "data" mzero,
-    dir "static" serveStatic,
-    dir "track" trackPage,
-    nullDir >> rootPage
-    ]
+myApp = do
+    uri <- rqUri <$> askRq
+    query <- rqQuery <$> askRq
+    trace (uri ++ query) $ msum [
+        dir "data" mzero,
+        dir "static" serveStatic,
+        dir "track" trackPage,
+        nullDir >> rootPage
+      ]
 
 serveStatic :: ServerPart Response
 serveStatic = serveDirectory DisableBrowsing [] "static"
