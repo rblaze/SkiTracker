@@ -13,6 +13,7 @@ import Text.Blaze ((!))
 import Text.Printf
 
 import Geo
+import GoogleStaticMap
 import PaintSki
 import SegmentedTrack
 import SegmentStats
@@ -53,6 +54,12 @@ printSegment name track = "    var " ++ name ++ " = [\n        "
         ++ ",\n        "
         ++ printPosition (tsEndPos $ last track) ++ "\n"
         ++ "     ];\n"
+
+printPolyLine :: String -> PolyLine -> String
+printPolyLine name line = "    var " ++ name
+        ++ " = google.maps.geometry.encoding.encodePath([\n        "
+        ++ intercalate ",\n        " (map printPosition $ plPoints line)
+        ++ "\n     ]);\n"
 
 {--
 setMarker :: String -> Position -> Int -> String -> String
@@ -116,25 +123,22 @@ addSegmentToMap uniq track = printSegment pathname (runPoints track)
 
 generateScript :: [SkiRun] -> H.Html
 generateScript track = do
-    H.script ! A.type_ "text/javascript" ! A.src (H.toValue $ "http://maps.googleapis.com/maps/api/js?key=" ++ googleApiKey ++ "&sensor=false") $ ""
+    H.script ! A.type_ "text/javascript" ! A.src (H.toValue $ "http://maps.googleapis.com/maps/api/js?key=" ++ googleApiKey ++ "&libraries=geometry&sensor=false") $ ""
     H.script ! A.type_ "text/javascript" $ H.toHtml script
+    H.script ! A.type_ "text/javascript" $ H.toHtml staticscript
     where
     script :: String
     script = header ++ path ++ footer
 
-    firstPoint = head $ runPoints $ head track
-
     header = "/****** begin script header *******/\n\
 \function initialize() {  \n\
 \    var centerPoint = " ++ printPosition (centerPoint track) ++ ";  \n\
-\//    var trackStart = " ++ printPosition (tsStartPos firstPoint) ++ ";\n\
 \    var myOptions = {  \n\
 \      zoom: 14,  \n\
 \      center: centerPoint,  \n\
 \      mapTypeId: google.maps.MapTypeId.TERRAIN  \n\
 \    };  \n\
 \    var map = new google.maps.Map(document.getElementById(\"map_canvas\"), myOptions);\n\
-\    var info = new google.maps.InfoWindow({ content: '" ++ "uninitialized" ++ "' });  \n\
 \    function onPathClick(event, message) {   \n\
 \        document.getElementById(\"segdata\").innerHTML = message;    \n\
 \    };  \n\
@@ -142,6 +146,19 @@ generateScript track = do
 
     footer = "}"
     path = concat $ zipWith addSegmentToMap [0..] track
+
+    staticmap = stripMap track
+    staticpath = zipWith printPolyLine ["static" ++ show (i::Int) | i <- [0..]] staticmap
+    staticurl =  "var mapurl = 'http://maps.googleapis.com/maps/api/staticmap?"
+                ++ concat (zipWith printUrlSeg [0..] staticmap)
+                ++ "&sensor=false&size=400x400';\n"
+
+    printUrlSeg n s = "&path=color:"
+        ++ (if plType s == Lift then "blue" else "red")
+        ++ "|enc:' + static" ++ show n ++ " + '"
+
+    staticscript :: String
+    staticscript = concat staticpath ++ staticurl
 
 styleSheet :: H.Html
 styleSheet = "\
@@ -264,7 +281,7 @@ initFacebook uri stats = do
 \                method: 'feed',    \n\
 \                display: 'popup',    \n\
 \                link: '" ++ uri ++ "',    \n\
-\                picture: 'http://skitracker.ruddy.ru/static/snowboarding.png',    \n\
+\                picture: mapurl,    \n\
 \                name: '" ++ aproxDistance stats ++ " down slope!',    \n\
 \                description: 'Total time " ++ duration stats ++ ", slope time " ++ slopeTime stats
                         ++ ", max speed " ++ maxSpeed stats ++ ", sustained speed " ++ maxSustainedSpeed stats ++ "'    \n\

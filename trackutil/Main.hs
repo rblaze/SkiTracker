@@ -14,6 +14,7 @@ import Parse
 import SegmentedTrack
 import PaintSki
 import Geo
+import GoogleStaticMap
 
 printSegment :: TrackSegment -> String
 printSegment s = intercalate "\t" [printf "%.2f" $ ts3Dspeed s,
@@ -75,6 +76,13 @@ main = do
             let colored = paintSkiTrack segments
 
             printf "%s" (renderHtml $ makeMapPage "http://skitracker.ruddy.ru" colored)
+        "static" -> do
+            filedata <- BS.readFile filename
+            let gpstrack = parseTrack filedata
+            let segments = makeSegmentedTrack gpstrack
+            let colored = paintSkiTrack segments
+
+            mapM_ (printf "%s\n\n" . show) $ stripMap colored
 {--
         "drawmarked" -> do
             filedata <- readFile filename
