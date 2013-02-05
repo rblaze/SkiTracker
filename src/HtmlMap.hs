@@ -55,10 +55,10 @@ printSegment name track = "    var " ++ name ++ " = [\n        "
         ++ printPosition (tsEndPos $ last track) ++ "\n"
         ++ "     ];\n"
 
-printPolyLine :: String -> PolyLine -> String
+printPolyLine :: String -> [Position] -> String
 printPolyLine name line = "    var " ++ name
         ++ " = google.maps.geometry.encoding.encodePath([\n        "
-        ++ intercalate ",\n        " (map printPosition $ plPoints line)
+        ++ intercalate ",\n        " (map printPosition line)
         ++ "\n     ]);\n"
 
 {--
@@ -148,17 +148,11 @@ generateScript track = do
     path = concat $ zipWith addSegmentToMap [0..] track
 
     staticmap = stripMap track
-    staticpath = zipWith printPolyLine ["static" ++ show (i::Int) | i <- [0..]] staticmap
-    staticurl =  "var mapurl = 'http://maps.googleapis.com/maps/api/staticmap?"
-                ++ concat (zipWith printUrlSeg [0 :: Int ..] staticmap)
-                ++ "&sensor=false&size=400x400';\n"
-
-    printUrlSeg n s = "&path=color:"
-        ++ (if plType s == Lift then "blue" else "red")
-        ++ "|enc:' + static" ++ show n ++ " + '"
+    staticpath = printPolyLine "staticline" $ concatMap plPoints staticmap
+    staticurl = "        var mapurl = 'http://maps.googleapis.com/maps/api/staticmap?path=enc:' + staticline + '&sensor=false&size=400x400';"
 
     staticscript :: String
-    staticscript = concat staticpath ++ staticurl
+    staticscript = staticpath ++ staticurl
 
 styleSheet :: H.Html
 styleSheet = "\
