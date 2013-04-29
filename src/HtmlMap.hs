@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module HtmlMap(makeMapPage) where
+module HtmlMap(makeMapPage, analyticsCode) where
 
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
@@ -31,6 +31,17 @@ data TrackStats = TrackStats {
         maxSpeed :: String,
         maxSustainedSpeed :: String
     }
+
+analyticsCode :: H.Html
+analyticsCode = H.script ! A.type_ "text/javascript" $ H.toHtml ("var _gaq = _gaq || [];  \n\
+\  _gaq.push(['_setAccount', 'UA-20054266-7']);  \n\
+\  _gaq.push(['_trackPageview']);  \n\
+\  \n\
+\  (function() {  \n\
+\    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;  \n\
+\    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';  \n\
+\    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);  \n\
+\  })();" :: String)
 
 googleApiKey :: String
 googleApiKey = "AIzaSyCtiE9l_Rhk7LNF-ImN5TJlkKTZWfL46XM"
@@ -310,3 +321,4 @@ makeMapPage uri track = do
                     H.div ! A.id "segdata" $ ""
                 H.div ! A.id "content" $ H.div ! A.class_ "paddedContent" $
                     H.div ! A.id "map_canvas" ! A.style "width: 100%; height: 100%" $ ""
+            analyticsCode

@@ -55,9 +55,10 @@ serveStatic = serveDirectory DisableBrowsing [] "static"
 template :: String -> Html -> Response
 template htitle hbody = toResponse $
     H.html $ do
-        H.head $
+        H.head $ do
             H.title (toHtml htitle)
-        H.body 
+            analyticsCode
+        H.body
             hbody
 
 rootPage :: ServerPart Response
