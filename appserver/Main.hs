@@ -64,6 +64,7 @@ template htitle hbody = toResponse $
 rootPage :: ServerPart Response
 rootPage = trace "Showing root" $ ok $ template "SkiTracker" $ do
                 H.p $ H.a ! A.href "/track" $ "Upload track"
+                H.p $ H.a ! A.href "/track/caf8ef5ae49eb34d9c3636004c980c18" $ "Sample track view"
                 H.p $ H.a ! A.href "https://github.com/rblaze/SkiTracker" $ "Source code"
 
 makeMap :: String -> BS.ByteString -> H.Html
