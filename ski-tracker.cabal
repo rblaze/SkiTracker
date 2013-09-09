@@ -12,6 +12,7 @@ executable skiserver
                    blaze-html,
                    blaze-markup,
                    bytestring,
+                   containers,
                    converge,
                    cryptohash,
                    directory,

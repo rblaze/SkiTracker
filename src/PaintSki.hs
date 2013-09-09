@@ -1,11 +1,14 @@
 module PaintSki(SkiRun(..), paintSkiTrack) where
 
+import Data.Foldable (Foldable(..), toList)
 import Data.Function
 import Data.List(groupBy)
+import Data.Sequence (ViewL(..), ViewR(..), (|>))
 import Data.Time(UTCTime)
 
-import qualified Queue as Q
 import qualified Data.Foldable as F
+import qualified Data.Sequence as Q
+
 import SegmentedTrack
 import Geo
 import Util
@@ -19,7 +22,7 @@ data SkiRun = SkiRun {
     runPoints    :: [TrackSegment]
   }
 
-type LookAhead = Q.Queue TrackSegment
+type LookAhead = Q.Seq TrackSegment
 
 minLiftDuration :: Num a => a
 minLiftDuration = 60
@@ -36,10 +39,10 @@ liftSpeedVariance = 0.23
 liftAzimuthDev :: Fractional a => a
 liftAzimuthDev = 0.14
 
-segDuration :: (Functor a, F.Foldable a) => a TrackSegment -> Double
+segDuration :: (Functor a, Foldable a) => a TrackSegment -> Double
 segDuration q = F.sum $ tsDuration `fmap` q
 
-segDistance :: (Functor a, F.Foldable a) => a TrackSegment -> Double
+segDistance :: (Functor a, Foldable a) => a TrackSegment -> Double
 segDistance q = F.sum $ (dvDistance . tsVector) `fmap` q
 
 setType :: Functor a => SegmentType -> a TrackSegment -> a TrackSegment
@@ -65,12 +68,15 @@ isGoodLift seg
     speedStddev = stddev $ fmap (\p -> ts3Dspeed p - avgSpeed) seg
     speedVariance = speedStddev / avgSpeed
 
-    straightLine = vincentyFormulae (tsStartPos $ Q.head seg) (tsEndPos $ Q.last seg)
+    shead :< _ = Q.viewl seg
+    _ :> slast = Q.viewr seg
+
+    straightLine = vincentyFormulae (tsStartPos shead) (tsEndPos slast)
     straightAzimuth = dvAzimuth straightLine
     segmentAzimuth = dvAzimuth . tsVector
     azimuthStddev = stddev $ fmap (azimuthDiff straightAzimuth . segmentAzimuth) seg
 
-    vdiff = tsEndAlt (Q.last seg) - tsStartAlt (Q.head seg)
+    vdiff = tsEndAlt slast - tsStartAlt shead
 
     hasStableSpeed = speedVariance < liftSpeedVariance
     hasStableDirection = azimuthStddev < liftAzimuthDev
@@ -80,12 +86,13 @@ paintLowSpeed = map (\s -> s{tsType = if ts3Dspeed s < 1.0 then Idle else Track 
 
 paintLifts :: LookAhead -> [TrackSegment] -> [TrackSegment]
 paintLifts liftq []
-    | not $ validLiftData liftq = Q.toList liftq
-    | not $ isGoodLift liftq    = Q.toList liftq
-    | otherwise                 = Q.toList $ setType Lift liftq
+    | not $ validLiftData liftq = toList liftq
+    | not $ isGoodLift liftq    = toList liftq
+    | otherwise                 = toList $ setType Lift liftq
 paintLifts liftq (s:ss)
-    | not $ validLiftData liftq = paintLifts (Q.push liftq s) ss
-    | not $ isGoodLift liftq    = Q.head liftq : paintLifts (Q.pop $ Q.push liftq s) ss
+    | not $ validLiftData liftq = paintLifts (liftq |> s) ss
+    | not $ isGoodLift liftq    = let qhead :< rest = Q.viewl liftq
+                                   in qhead : paintLifts (rest |> s) ss
     | otherwise                 = tryExpandLift liftq s ss
 
 tryExpandLift :: LookAhead -> TrackSegment -> [TrackSegment] -> [TrackSegment]
@@ -93,8 +100,8 @@ tryExpandLift liftq s ss
     | isGoodLift nextq = paintLifts nextq ss
     | otherwise        = repainted ++ paintLifts Q.empty ss
     where
-    nextq = Q.push liftq s
-    repainted = Q.toList $ setType Lift liftq
+    nextq = liftq |> s
+    repainted = toList $ setType Lift liftq
 
 mergeHead :: [[TrackSegment]] ->  [[TrackSegment]]
 mergeHead track = if null rest then track else (mhead ++ r):rs
